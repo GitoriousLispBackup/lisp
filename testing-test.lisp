@@ -1,14 +1,13 @@
 (load "testing.lisp")
 
-(defun test-testing ()
+(defcase test-testing
   (true)
   (report)
   (another)
   (=-test)
-  (format t "~%")
-  (format t (get-output-stream-string *summary-stream*)))
-
-(deftest test-testing true ()
+  (<>-test))
+ 
+ (deftest test-testing true ()
   (!t t))
 
 (deftest test-testing report ()
@@ -23,5 +22,7 @@
   (!t (= 2 2)))
 
 (deftest test-testing =-test ()
-  (!= (* 2 2) 4)
-  (!= (* 2 2) 5))
+  (!= (* 2 2) 4))
+
+(deftest test-testing <>-test ()
+  (!<> 2 3))
