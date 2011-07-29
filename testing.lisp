@@ -18,25 +18,22 @@
 
 (defvar *test-result* t)
 
-(defmacro defcase (name &body body)
-  (progn
-   `(setf (get ',name 'tests) ',body)
-   `(defun ,name ()
-      (setq *success-tests* 0)
-      (setq *failed-tests* 0)
-      ,@body
-      (format t "~%")
-      (format t (get-output-stream-string *summary-stream*))
-      (format t "~%~a tests of ~a failed.~%" *failed-tests* (+ *failed-tests* *success-tests*)))))
-
+(defmacro defcase (name)
+  `(progn 
+     (if (boundp '*test-cases*)
+	 (setq *test-cases* (adjoin ',name *test-cases*))
+	 (setq *test-cases* (list ',name)))
+     (defclass ,name () nil)))
 
 (defmacro deftest (test-case name args &body body)
-  `(defun ,name ,args
-     (format t "Running test ~a.~a~%" ',test-case ',name)
-     (let ((*test-result* t))
-       ,@body
-       (report-result *test-result* ,(concatenate 'string "Test " (string test-case) "." (string name)))
-       (cond ((not (null *test-result*)) (format t "OK.~%"))))))
+  `(progn
+     (setf (get ',test-case 'tests) (adjoin ',name (get ',test-case 'tests)))
+     (defmethod ,name ((a-case ,test-case ) ,@args)
+       (format t "Running test ~a.~a~%" ',test-case ',name)
+       (let ((*test-result* t))
+	 ,@body
+	 (report-result *test-result* ,(concatenate 'string "Test " (string test-case) "." (string name)))
+	 (cond ((not (null *test-result*)) (format t "OK.~%")))))))
 
 (defmacro check (check-expr &body body)
   `(if (not ,check-expr)
@@ -47,9 +44,47 @@
   `(check ,expr (format t "~a is nil.~%" ',expr)))
 
 (defmacro != (expr1 expr2)
-  `(check (= ,expr1 ,expr2)
-     (format t "~a is ~a.Expected ~a which is ~a.~%" ',expr1 ,expr1 ',expr2 ,expr2 )))
+  (let ((value1 (gensym)) (value2 (gensym)))
+    `(let ((,value1 ,expr1) (,value2 ,expr2))
+       (check (= ,value1 ,value2)
+	 (format t "~a is ~a.Expected ~a which is ~a.~%" ',expr1 ,value1 ',expr2 ,value2)))))
 
 (defmacro !<> (expr1 expr2)
-  `(check (/= ,expr1 ,expr2)
-     (format t "~a is ~a. Expected not ~a.~%" ',expr1 ,expr1 ',expr2))) 
+  (let ((value1 (gensym)) (value2 (gensym)))
+    `(let ((,value1 ,expr1) (,value2 ,expr2))
+       (check (/= ,value1 ,value2)
+	 (format t "~a is ~a. Expected not ~a.~%" ',expr1 ,value1 ',expr2)))))
+
+(defun prepare-test ()
+  (setq *success-tests* 0)
+  (setq *failed-tests* 0))
+
+(defun test-summary ()
+  (format t "~%")
+  (format t (get-output-stream-string *summary-stream*))
+  (format t "~%~a tests of ~a success.~%" *success-tests* (+ *failed-tests* *success-tests*)))
+
+(defun do-run-test (name case)
+  (funcall name (make-instance case)))
+
+(defun run-test (name case-name)
+  (prepare-test)
+  (do-run-test name case-name)
+  (test-summary))
+
+(defun do-run-case (name)
+  (mapcar #'(lambda (test) (do-run-test test name)) (get name 'tests)))
+
+(defun run-case (name)
+  (prepare-test)
+  (do-run-case name)
+  (test-summary))
+
+(defun run-tests ()
+  (prepare-test)
+  (dolist (test-case *test-cases*)
+    (do-run-case test-case))
+  (test-summary))
+
+
+

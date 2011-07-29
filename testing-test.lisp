@@ -1,13 +1,8 @@
 (load "testing.lisp")
 
-(defcase test-testing
-  (true)
-  (report)
-  (another)
-  (=-test)
-  (<>-test))
- 
- (deftest test-testing true ()
+(defcase test-testing)
+
+(deftest test-testing true ()
   (!t t))
 
 (deftest test-testing report ()
@@ -26,3 +21,8 @@
 
 (deftest test-testing <>-test ()
   (!<> 2 3))
+
+(defcase other-testing)
+
+(deftest other-testing true ()
+  (!t t))
