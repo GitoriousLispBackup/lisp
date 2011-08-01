@@ -20,26 +20,25 @@
 (defparameter *success-tests* 0)
 (defparameter *failed-tests* 0)
 
-(defun report-success (report log-stream)
+(defun report-success (report)
   (funcall *summary-listener* (concatenate 'string report " success."))
   (incf *success-tests*))
 
-(defun report-failure (report log-stream)
+(defun report-failure (report)
   (funcall *summary-listener* (concatenate 'string report " FAILED."))
   (incf *failed-tests*))
 
-(defun report-result( expr report &optional (log-stream t))
-  (cond ((null expr) (report-failure report log-stream))
-        (t (report-success report log-stream))))
+(defun report-result( expr report)
+  (cond ((null expr) (report-failure report))
+        (t (report-success report))))
 
 (defvar *test-result* t)
 
+(defparameter *test-cases* ())
+
 (defmacro defcase (name)
   `(progn 
-     (union *test-packages* (list *package*))
-     (if (boundp '*test-cases*)
-	 (setq *test-cases* (union *test-cases* (list ',name)))
-	 (setq *test-cases* (list ',name)))
+     (setq *test-cases* (union *test-cases* (list ',name)))
      (defclass ,name () nil)))
 
 (defmacro deftest (test-case name args &body body)
