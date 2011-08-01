@@ -1,5 +1,11 @@
 (load "testing.lisp")
 
+(defpackage :burning-testing-test
+  (:use :common-lisp
+        :burning-testing))
+
+(in-package :burning-testing-test)
+
 (defcase test-testing)
 
 (deftest test-testing true ()
@@ -21,6 +27,11 @@
 
 (deftest test-testing <>-test ()
   (!<> 2 3))
+
+(deftest test-testing equal-test ()
+  (!equal '(2 2) '(2 2))
+  (!equal '((2 2) 2) '((2 2) 2))
+  (!equal '(2 2) '(2 2 (2 2))))
 
 (defcase other-testing)
 

@@ -1,3 +1,19 @@
+(defpackage :burning-testing
+  (:use common-lisp)
+  (:export :defcase
+	   :deftest
+	   :!t
+	   :!=
+	   :!equal
+	   :!<>
+	   :run-test
+	   :run-case
+	   :run-tests))
+
+(in-package :burning-testing)
+
+(defparameter *test-packages* ())
+
 (defparameter *summary-stream* (make-string-output-stream))
 (defparameter *summary-listener* (lambda (report) (format *summary-stream* "~a~%" report)))
 
@@ -20,14 +36,15 @@
 
 (defmacro defcase (name)
   `(progn 
+     (union *test-packages* (list *package*))
      (if (boundp '*test-cases*)
-	 (setq *test-cases* (adjoin ',name *test-cases*))
+	 (setq *test-cases* (union *test-cases* (list ',name)))
 	 (setq *test-cases* (list ',name)))
      (defclass ,name () nil)))
 
 (defmacro deftest (test-case name args &body body)
   `(progn
-     (setf (get ',test-case 'tests) (adjoin ',name (get ',test-case 'tests)))
+     (setf (get ',test-case 'tests) (union (get ',test-case 'tests) (list ',name)))
      (defmethod ,name ((a-case ,test-case ) ,@args)
        (format t "Running test ~a.~a~%" ',test-case ',name)
        (let ((*test-result* t))
@@ -40,14 +57,20 @@
        (progn (setq *test-result* nil)
 	      ,@body)))
 
+(defmacro equal-check (expr1 expr2 predicate)
+  (let ((value1 (gensym)) (value2 (gensym)))
+    `(let ((,value1 ,expr1) (,value2 ,expr2))
+       (check (,predicate ,value1 ,value2)
+	      (format t "~a is ~a.Expected ~a which is ~a.~%" ',expr1 ,value1 ',expr2 ,value2)))))
+
 (defmacro !t (expr) 
   `(check ,expr (format t "~a is nil.~%" ',expr)))
 
 (defmacro != (expr1 expr2)
-  (let ((value1 (gensym)) (value2 (gensym)))
-    `(let ((,value1 ,expr1) (,value2 ,expr2))
-       (check (= ,value1 ,value2)
-	 (format t "~a is ~a.Expected ~a which is ~a.~%" ',expr1 ,value1 ',expr2 ,value2)))))
+  `(equal-check ,expr1 ,expr2 =))
+
+(defmacro !equal (expr1 expr2)
+  `(equal-check ,expr1, expr2 equal))
 
 (defmacro !<> (expr1 expr2)
   (let ((value1 (gensym)) (value2 (gensym)))
