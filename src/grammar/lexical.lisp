@@ -69,3 +69,50 @@
         ((eq (car expr) 'repeat) (full-repeat-node (list-to-tree (second expr)) (third expr) (fourth expr)))
         ((eq (car expr) '-) (range-node (character (second expr)) (character (third expr))))
         (t (error "Wrong operation"))))
+
+(defun make-lexeme (name expr)
+  (and-node (regular-to-tree expr) (list 'final name)))
+
+(defun integer-generator (n)
+  (decf n)
+  (lambda () (incf n)))
+
+(defun add-positions (lexeme generator)
+  (cond ((null lexeme) lexeme)
+	((characterp (first lexeme)) (append lexeme (list (funcall generator))))
+	((eq (first lexeme) 'final) (append lexeme (list (funcall generator))))
+	(t (cons (first lexeme) (mapcar #'(lambda (x) (add-positions x generator)) (rest lexeme))))))
+
+(defun do-make-lexic (lexemes generator)
+  (cond ((null lexemes) ())
+	((null (rest lexemes)) (add-positions (car lexemes) generator))
+	(t (or-node (add-positions (car lexemes) generator) (do-make-lexic (rest lexemes) generator)))))
+
+(defstruct lexic expression follow-vector)
+
+(defun make-lexic (&rest lexemes)
+  (let ((generator (integer-generator 0)))
+    (make-instance 'lexic :expression (do-make-lexic lexemes generator) 
+		   :follow-vector (make-array (funcall generator)))))
+
+(defmacro deflexeme (name value)
+  `(defparameter ,name (make-lexeme ',name ',value)))
+
+(defun nullable (lexeme)
+  (cond ((null (car lexeme)) t)
+	((characterp (car lexeme)) nil)
+        ((eq 'finish (car lexeme)) nil)
+	((eq 'and (car lexeme)) (and (nullable (second lexeme))
+				     (nullable (third lexeme))))
+	((eq 'or (car lexeme)) (or (nullable (second lexeme))
+				   (nullable (third lexeme))))
+	((eq 'star (car lexeme)) t)))
+
+(defun first-pos (lexeme)
+  (cond ((null (car lexeme)) ())
+	((characterp (car lexeme)) (list (second lexeme)))
+	((eq (car lexeme) 'final) (list (third lexeme)))
+	((eq (car lexeme) 'and) (first-pos (second lexeme)))
+	((eq (car lexeme) 'or) (sort (union (first-pos (second lexeme)) 
+					    (first-pos (third lexeme)))
+				     #'<))))

@@ -4,7 +4,9 @@
 	   :deftest
 	   :!t
 	   :!=
+	   :!eq
 	   :!equal
+	   :!equalp
 	   :!<>
 	   :run-test
 	   :run-case
@@ -70,7 +72,13 @@
   `(equal-check ,expr1 ,expr2 =))
 
 (defmacro !equal (expr1 expr2)
-  `(equal-check ,expr1, expr2 equal))
+  `(equal-check ,expr1 ,expr2 equal))
+
+(defmacro !equalp (expr1 expr2)
+  `(equal-check ,expr1 ,expr2 equalp))
+
+(defmacro !eq (expr1 expr2)
+  `(equal-check ,expr1 ,expr2 eq))
 
 (defmacro !<> (expr1 expr2)
   (let ((value1 (gensym)) (value2 (gensym)))
