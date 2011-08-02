@@ -39,6 +39,7 @@
 (defmacro defcase (name)
   `(progn 
      (setq *test-cases* (union *test-cases* (list ',name)))
+     (setf (get ',name 'tests) nil)
      (defclass ,name () nil)))
 
 (defmacro deftest (test-case name args &body body)
