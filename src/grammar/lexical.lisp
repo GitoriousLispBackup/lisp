@@ -88,31 +88,159 @@
 	((null (rest lexemes)) (add-positions (car lexemes) generator))
 	(t (or-node (add-positions (car lexemes) generator) (do-make-lexic (rest lexemes) generator)))))
 
-(defstruct lexic expression follow-vector)
+(defstruct lexic expression follow-vector value-vector next-vector)
+
+(defun expression (lexic)
+  (slot-value lexic 'expression))
+
+(defun follow-vector (lexic)
+  (slot-value lexic 'follow-vector))
 
 (defun make-lexic (&rest lexemes)
-  (let ((generator (integer-generator 0)))
-    (make-instance 'lexic :expression (do-make-lexic lexemes generator) 
-		   :follow-vector (make-array (funcall generator)))))
+  (let* ((generator (integer-generator 0))
+	 (lex (do-make-lexic lexemes generator))
+	 (size (funcall generator)))
+    (make-instance 'lexic :expression lex
+    :follow-vector (make-array size :initial-element nil)
+    :value-vector (make-array size :initial-element nil)
+    :next-vector (make-array size :initial-element nil))))
 
 (defmacro deflexeme (name value)
   `(defparameter ,name (make-lexeme ',name ',value)))
 
+(defmacro deflexic (name &rest lexemes)
+  `(progn
+     (defparameter ,name (make-lexic ,@lexemes))
+     (fill-follow-pos (expression ,name) (follow-vector ,name))
+     (fill-values (expression ,name) (slot-value ,name 'value-vector) (slot-value ,name 'next-vector))))
+
+(defun lexeme-true (lexeme) t)
+(defun lexeme-false (lexeme) nil)
+
+(defmacro defprop (node name args &body body)
+  `(setf (get ',node ',name) 
+	 (lambda ,args ,@body)))
+
+(defprop nil nullable (lexeme) t)
+(defprop character nullable (lexeme) nil)
+(defprop final nullable (lexeme) nil)
+(defprop star nullable (lexeme) t)
+
+(defprop and nullable (lexeme)
+  (and (nullable (second lexeme))
+       (nullable (third lexeme))))
+
+(defprop or nullable (lexeme)
+  (or (nullable (second lexeme))
+      (nullable (third lexeme))))
+  
+(defun lexeme-function (name &rest args)
+  (let ((lexeme (car args)))
+    (cond 
+      ((null (car lexeme)) (apply (get nil name) args))
+      ((characterp (car lexeme)) (apply (get 'character name) args))
+      (t (apply (get (car lexeme) name) args)))))
+
 (defun nullable (lexeme)
-  (cond ((null (car lexeme)) t)
-	((characterp (car lexeme)) nil)
-        ((eq 'finish (car lexeme)) nil)
-	((eq 'and (car lexeme)) (and (nullable (second lexeme))
-				     (nullable (third lexeme))))
-	((eq 'or (car lexeme)) (or (nullable (second lexeme))
-				   (nullable (third lexeme))))
-	((eq 'star (car lexeme)) t)))
+  (lexeme-function 'nullable lexeme))
+
+(defun make-set (first second)
+  (sort (copy-list (union first second)) #'<))
+
+(defprop nil first-pos (lexeme) ())
+
+(defprop character first-pos (lexeme) 
+  (list (second lexeme)))
+
+(defprop final first-pos (lexeme)
+  (list (third lexeme)))
+
+(defprop and first-pos (lexeme)
+  (if (nullable (second lexeme))
+      (make-set (first-pos (second lexeme)) (first-pos (third lexeme)))
+      (first-pos (second lexeme))))
+
+(defprop or first-pos (lexeme)
+  (make-set (first-pos (second lexeme))
+	    (first-pos (third lexeme))))
+
+(defprop star first-pos (lexeme)
+  (first-pos (second lexeme)))
 
 (defun first-pos (lexeme)
-  (cond ((null (car lexeme)) ())
-	((characterp (car lexeme)) (list (second lexeme)))
-	((eq (car lexeme) 'final) (list (third lexeme)))
-	((eq (car lexeme) 'and) (first-pos (second lexeme)))
-	((eq (car lexeme) 'or) (sort (union (first-pos (second lexeme)) 
-					    (first-pos (third lexeme)))
-				     #'<))))
+  (lexeme-function 'first-pos lexeme))
+
+(defprop nil last-pos (lexeme) ())
+
+(defprop character last-pos (lexeme)
+  (list (second lexeme)))
+
+(defprop final last-pos (lexeme)
+  (list (third lexeme)))
+
+(defprop and last-pos (lexeme)
+  (if (nullable (third lexeme))
+      (make-set (last-pos (second lexeme)) (last-pos (third lexeme)))
+      (last-pos (third lexeme))))
+
+(defprop or last-pos (lexeme)
+  (make-set (last-pos (second lexeme))
+	    (last-pos (third lexeme))))
+
+(defprop star last-pos (lexeme)
+  (last-pos (second lexeme)))
+
+(defun last-pos (lexeme)
+  (lexeme-function 'last-pos lexeme))
+
+(defprop nil follow-pos (lexeme vector) ())
+(defprop character follow-pos (lexeme vector) ())
+(defprop final follow-pos (lexeme vector) ())
+
+(defprop or follow-pos (lexeme vector)
+  (fill-follow-pos (second lexeme) vector)
+  (fill-follow-pos (third lexeme) vector))
+
+(defprop and follow-pos (lexeme vector)
+  (let ((fst (first-pos (third lexeme)))
+	(lst (last-pos (second lexeme))))
+    (set-vector lst fst vector))
+  (fill-follow-pos (second lexeme) vector)
+  (fill-follow-pos (third lexeme) vector))
+
+(defun set-vector (positions values vector)
+  (dolist (position positions)
+    (setf (elt vector position) 
+	  (make-set (elt vector position) values))))
+
+(defprop star follow-pos (lexeme vector)
+  (let ((fst (first-pos (second lexeme)))
+	(lst (last-pos (second lexeme))))
+    (set-vector lst fst vector))
+  (fill-follow-pos (second lexeme) vector))
+
+(defun fill-follow-pos (lexeme vector)
+  (lexeme-function 'follow-pos lexeme vector))
+
+(defun fill-values (lexeme values next)
+  (lexeme-function 'value lexeme values next))
+
+(defprop nil value (lexeme v n) nil)
+
+(defprop character value (lexeme v next) 
+  (setf (elt next (second lexeme))
+	(first lexeme)))
+
+(defprop final value (lexeme vector n) (setf (elt vector (third lexeme))
+					     (second lexeme)))
+
+(defprop and value (lexeme value n)
+  (fill-values (second lexeme) value n)
+  (fill-values (third lexeme) value n))
+
+(defprop or value (lexeme value n)
+  (fill-values (second lexeme) value n)
+  (fill-values (third lexeme) value n))
+
+(defprop star value (lexeme value n)
+  (fill-values (second lexeme) value n))

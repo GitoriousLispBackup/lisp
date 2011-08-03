@@ -78,7 +78,9 @@
 	     (make-instance 'lexic 
 			    :expression '(or (and (and (#\s 0) (#\1 1)) (final sample1 2))
 					  (and (and (#\s 3) (#\2 4)) (final sample2 5)))
-			    :follow-vector (make-array 6)))))
+			    :follow-vector (make-array 6)
+			    :value-vector (make-array 6)
+			    :next-vector (make-array 6)))))
 
 (deftest lexical-test deflexeme-test ()
   (!equal (macroexpand-1 '(deflexeme if ("if")))
@@ -89,15 +91,43 @@
   (!eq (nullable (regular-to-tree '((* "a")))) t)
   (!eq (nullable (regular-to-tree '((? "ab")))) t)
   (!eq (nullable (regular-to-tree '((* "ab") (? "cd") "ef"))) nil)
-  (!eq (nullable (regular-to-tree '((* "ab") (? "cd") (|| "ef" "gh" (? "ij"))))) t))
+  (!eq (nullable (regular-to-tree '((* "ab") (? "cd") (|| "ef" "gh" (? "ij"))))) t)
+  (!eq (nullable '(final end)) nil))
 
-(deflexeme if ("if"))
-(deflexeme then ("then"))
-(deflexeme word ((+ (- "a" "z"))))
-(deflexeme integer ((? (|| "-" "+")) (+ (- "0" "9"))))
+(deflexeme if ("aba"))
+(deflexeme then ("abbab"))
+(deflexeme word ((+ (- "a" "b"))))
+(deflexeme integer ((? (|| "-" "+")) (+ (- "0" "1"))))
+(deflexeme spaces ((* " ")))
 
 (deftest lexical-test first-test ()
-  (!= (first-pos (make-lexical if)) '(0))
-  (!= (first-pos (make-lexical then)) '(0))
-  (!= (first-pos (make-lexical word)) '(0 1 2 3 4 5 6 7 8 9 10 11 12 13 
-				    14 15 16 17 18 19 20 21 22 23 24 25)))
+  (!equal (first-pos (expression (make-lexic if))) '(0))
+  (!equal (first-pos (expression (make-lexic word))) 
+          '(0 1))
+  (!equal (first-pos (expression (make-lexic integer)))
+	  '(0 1 2 3))
+  (!equal (first-pos (expression (make-lexic spaces)))
+	  '(0 1)))
+
+(deftest lexical-test last-test ()
+  (!equal (last-pos (expression (make-lexic if))) '(3))
+  (!equal (last-pos (expression (make-lexic (second word))))
+	  '(0 1 2 3))
+  (!equal (last-pos (expression (make-lexic (second integer))))
+	  '(2 3 4 5)))
+
+(deflexic sample-lexic (make-lexeme 'sample '((* (|| "a" "b")) "aab")))
+(deflexic my-lexic if then word integer spaces)
+
+(deftest lexical-test follow-test ()
+  (!equalp (follow-vector sample-lexic)
+	   #((0 1 2) (0 1 2) (3) (4) (5) ())))
+
+(deftest lexical-test lexic-generation ()
+  (!equalp sample-lexic
+	   (make-instance 'lexic
+			  :expression '(and (and (star (or (#\a 0) (#\b 1))) (and (#\a 2) (and (#\a 3) (#\b 4))))
+					(final sample 5))
+			  :follow-vector #((0 1 2) (0 1 2) (3) (4) (5) ())
+			  :value-vector #(nil nil nil nil nil sample)
+			  :next-vector #(#\a #\b #\a #\a #\b nil))))
