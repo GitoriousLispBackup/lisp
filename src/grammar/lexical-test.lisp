@@ -116,7 +116,7 @@
   (!equal (last-pos (expression (make-lexic (second integer))))
 	  '(2 3 4 5)))
 
-(deflexic sample-lexic (make-lexeme 'sample '((* (|| "a" "b")) "aab")))
+(deflexic sample-lexic (make-lexeme 'sample '((* (|| "a" "b")) "abb")))
 (deflexic my-lexic if then word integer spaces)
 
 (deftest lexical-test follow-test ()
@@ -126,8 +126,18 @@
 (deftest lexical-test lexic-generation ()
   (!equalp sample-lexic
 	   (make-instance 'lexic
-			  :expression '(and (and (star (or (#\a 0) (#\b 1))) (and (#\a 2) (and (#\a 3) (#\b 4))))
+			  :expression '(and (and (star (or (#\a 0) (#\b 1))) (and (#\a 2) (and (#\b 3) (#\b 4))))
 					(final sample 5))
 			  :follow-vector #((0 1 2) (0 1 2) (3) (4) (5) ())
 			  :value-vector #(nil nil nil nil nil sample)
-			  :next-vector #(#\a #\b #\a #\a #\b nil))))
+			  :next-vector #(#\a #\b #\a #\b #\b nil))))
+
+(deftest lexical-test state-machine-creating ()
+  (let ((machine (create-state-machine sample-lexic)))
+    (!equalp (machine-values machine)
+	     #(nil nil nil sample))
+    (!equalp (machine-transitions machine)
+	     #(((#\a . 1) (#\b . 0))
+	       ((#\a . 1) (#\b . 2))
+	       ((#\a . 1) (#\b . 3))
+	       ((#\a . 1) (#\b . 0))))))

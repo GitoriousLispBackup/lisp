@@ -96,6 +96,12 @@
 (defun follow-vector (lexic)
   (slot-value lexic 'follow-vector))
 
+(defun value-vector (lexic)
+  (slot-value lexic 'value-vector))
+
+(defun next-vector (lexic)
+  (slot-value lexic 'next-vector))
+
 (defun make-lexic (&rest lexemes)
   (let* ((generator (integer-generator 0))
 	 (lex (do-make-lexic lexemes generator))
@@ -244,3 +250,73 @@
 
 (defprop star value (lexeme value n)
   (fill-values (second lexeme) value n))
+
+(defstruct state-machine values transitions)
+
+(defun make-state-machine ()
+  (make-instance 'state-machine 
+		 :values (make-array 0 :adjustable t :fill-pointer 0)
+		 :transitions (make-array 0 :adjustable t :fill-pointer 0)))
+
+(defun machine-values (machine)
+  (slot-value machine 'values))
+
+(defun machine-transitions (machine)
+  (slot-value machine 'transitions))
+
+(defun fill-nexts (state lexic table)
+  (let ((next (elt (next-vector lexic) state)))
+    (unless (null next)
+      (setf (gethash next table)
+	    (make-set (copy-list (elt (follow-vector lexic) state))
+		      (gethash next table))))))
+
+(defun add-machine-state (machine)
+  (vector-push-extend nil (machine-values machine))
+  (vector-push-extend nil (machine-transitions machine))
+  (- (length (machine-values machine)) 1))
+
+(defun add-state-function (state machine visited-states &aux (new-states nil))
+  (list 
+   (lambda (next next-state)
+     (let ((next-state-id (gethash next-state visited-states)))
+       (unless next-state-id
+	 (setq next-state-id (add-machine-state machine))
+	 (push next-state new-states)
+	 (setf (gethash next-state visited-states) next-state-id))
+       (push (cons next next-state-id) 
+	     (elt (machine-transitions machine) 
+		  (gethash state visited-states)))))
+   (lambda () new-states)))
+
+(defun state-value (state-set lexic)
+  (dolist (state state-set)
+    (let ((value (elt (value-vector lexic) state)))
+      (if value
+	  (return value)))))
+
+(defun set-state-transitions (state-set lexic machine visited-states)
+  (let ((next-states (make-hash-table))
+	(new-states nil)
+	(add-state-funcs (add-state-function state-set machine visited-states)))
+    (dolist (state state-set)
+      (fill-nexts state lexic next-states))
+    (maphash (first add-state-funcs) next-states)
+    (funcall (second add-state-funcs))))
+
+(defun process-state (state lexic machine visited-states &aux next-states)
+  (setf (elt (machine-values machine) (gethash state visited-states))
+	(state-value state lexic))
+  (setq next-states (set-state-transitions state lexic machine visited-states))
+  (dolist (next-state next-states)
+    (process-state next-state lexic machine visited-states)))
+
+(defun create-state-machine (lexic)
+  (let ((machine (make-state-machine))
+	(visited-states (make-hash-table :test 'equal))
+	(first-state (first-pos (expression lexic))))
+    (setf (gethash first-state visited-states) 0)
+    (add-machine-state machine)
+    (process-state first-state lexic machine visited-states)
+    machine))
+      
