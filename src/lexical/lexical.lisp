@@ -1,77 +1,4 @@
-(defun character-node (char)
-  (list char))
-
-(defun and-node (left right)
-  (list 'and left right))
-
-(defun star-node (child)
-  (list 'star (list-to-tree child)))
-
-(defun or-node (left right)
-  (list 'or left right))
-
-(defun maybe-node (child)
-  (or-node () child))
-
-(defun ?repeat-node (child times)
-  (cond
-    ((= 0 times) ())
-    ((= 1 times) (maybe-node child))
-    (t (and-node (?repeat-node child (- times 1)) (maybe-node child)))))
-
-(defun repeat-node (child times)
-  (cond
-    ((= 0 times) ())
-    ((= 1 times) child)
-    (t (and-node (repeat-node child (- times 1)) child))))
-
-(defun full-repeat-node (child min-times max-times)
-  (cond 
-    ((null max-times) (repeat-node child min-times))
-    ((< max-times min-times) (error "Max times in repeat lesser than min times."))
-    ((= min-times max-times) (repeat-node child min-times))
-    ((= 0 min-times) (?repeat-node child max-times))
-    (t (and-node (repeat-node child min-times) (?repeat-node child (- max-times min-times))))))
-
-(defun range-node (first last)
-  (let ((value1 (char-code first)) (value2 (char-code last)))
-     (cond ((> value1 value2) (error "First symbol in range greater than last."))
-	   ((= value1 value2) (character-node first))
-           (t (or-node (character-node first) (range-node (character (1+ value1)) last))))))
-
-(defun regular-to-tree (expr)
-  (cond ((null expr) nil)
-        ((consp expr) (list-to-tree expr))
-        (t (error "Given regular expression is not list."))))
-
-(defun list-to-tree (expr &optional (node-generator #'and-node))
-  (cond ((null expr) nil)
-        ((null (cdr expr)) (atom-to-tree (car expr)))
-        (t (funcall node-generator (atom-to-tree (car expr)) (list-to-tree (cdr expr) node-generator)))))
-
-(defun atom-to-tree (expr)
-  (cond ((characterp expr) (character-node expr))
-        ((stringp expr) (string-to-tree expr))
-        ((consp expr) (operation-to-tree expr))
-        (t (error "Wrong non-character atom."))))
-
-(defun string-to-tree (string &optional (pos 0))
-  (cond ((= pos (length string)) ())
-        ((= pos (- (length string) 1)) (atom-to-tree (char string pos)))
-        (t (and-node (atom-to-tree (char string pos)) (string-to-tree string (1+ pos)))))) 
-
-(defun operation-to-tree (expr)
-  (cond ((eq (car expr) '*) (star-node (cdr expr)))
-        ((eq (car expr) '+) (and-node (list-to-tree (cdr expr)) (star-node (cdr expr))))
-        ((eq (car expr) '||) (list-to-tree (cdr expr) #'or-node))
-        ((eq (car expr) '?) (maybe-node (list-to-tree (cdr expr))))
-        ((eq (car expr) '?repeat) (?repeat-node (list-to-tree (second expr)) (third expr)))
-        ((eq (car expr) 'repeat) (full-repeat-node (list-to-tree (second expr)) (third expr) (fourth expr)))
-        ((eq (car expr) '-) (range-node (character (second expr)) (character (third expr))))
-        (t (error "Wrong operation"))))
-
-(defun make-lexeme (name expr)
-  (and-node (regular-to-tree expr) (list 'final name)))
+(in-package :burning-lexical)
 
 (defun integer-generator (n)
   (decf n)
@@ -88,28 +15,23 @@
 	((null (rest lexemes)) (add-positions (car lexemes) generator))
 	(t (or-node (add-positions (car lexemes) generator) (do-make-lexic (rest lexemes) generator)))))
 
-(defstruct lexic expression follow-vector value-vector next-vector)
-
-(defun expression (lexic)
-  (slot-value lexic 'expression))
-
-(defun follow-vector (lexic)
-  (slot-value lexic 'follow-vector))
-
-(defun value-vector (lexic)
-  (slot-value lexic 'value-vector))
-
-(defun next-vector (lexic)
-  (slot-value lexic 'next-vector))
+(defclass lexic () 
+  ((expression :initarg :expression :accessor expression)
+   (follow-vector :initarg :follow-vector :accessor follow-vector)
+   (value-vector :initarg :value-vector :accessor value-vector)
+   (next-vector :initarg :next-vector :accessor next-vector)))
 
 (defun make-lexic (&rest lexemes)
+  (make-instance 'lexic :lexemes lexemes))
+
+(defmethod initialize-instance :after ((lexic lexic) &key lexemes)
   (let* ((generator (integer-generator 0))
 	 (lex (do-make-lexic lexemes generator))
 	 (size (funcall generator)))
-    (make-instance 'lexic :expression lex
-    :follow-vector (make-array size :initial-element nil)
-    :value-vector (make-array size :initial-element nil)
-    :next-vector (make-array size :initial-element nil))))
+    (setf (expression lexic) lex)
+    (setf (follow-vector lexic) (make-array size :initial-element nil))
+    (setf (value-vector lexic) (make-array size :initial-element nil))
+    (setf (next-vector lexic) (make-array size :initial-element nil))))
 
 (defmacro deflexeme (name value)
   `(defparameter ,name (make-lexeme ',name ',value)))
@@ -120,17 +42,25 @@
      (fill-follow-pos (expression ,name) (follow-vector ,name))
      (fill-values (expression ,name) (slot-value ,name 'value-vector) (slot-value ,name 'next-vector))))
 
-(defun lexeme-true (lexeme) t)
-(defun lexeme-false (lexeme) nil)
-
 (defmacro defprop (node name args &body body)
   `(setf (get ',node ',name) 
 	 (lambda ,args ,@body)))
 
-(defprop nil nullable (lexeme) t)
-(defprop character nullable (lexeme) nil)
-(defprop final nullable (lexeme) nil)
-(defprop star nullable (lexeme) t)
+(defprop nil nullable (lexeme)
+  (declare (ignore lexeme))
+  t)
+
+(defprop character nullable (lexeme)
+  (declare (ignore lexeme))
+  nil)
+
+(defprop final nullable (lexeme)
+  (declare (ignore lexeme))
+  nil)
+
+(defprop star nullable (lexeme)
+  (declare (ignore lexeme))
+  t)
 
 (defprop and nullable (lexeme)
   (and (nullable (second lexeme))
@@ -153,7 +83,9 @@
 (defun make-set (first second)
   (sort (copy-list (union first second)) #'<))
 
-(defprop nil first-pos (lexeme) ())
+(defprop nil first-pos (lexeme) 
+  (declare (ignore lexeme))
+  ())
 
 (defprop character first-pos (lexeme) 
   (list (second lexeme)))
@@ -176,7 +108,9 @@
 (defun first-pos (lexeme)
   (lexeme-function 'first-pos lexeme))
 
-(defprop nil last-pos (lexeme) ())
+(defprop nil last-pos (lexeme) 
+  (declare (ignore lexeme))
+  ())
 
 (defprop character last-pos (lexeme)
   (list (second lexeme)))
@@ -199,9 +133,17 @@
 (defun last-pos (lexeme)
   (lexeme-function 'last-pos lexeme))
 
-(defprop nil follow-pos (lexeme vector) ())
-(defprop character follow-pos (lexeme vector) ())
-(defprop final follow-pos (lexeme vector) ())
+(defprop nil follow-pos (lexeme vector) 
+  (declare (ignore lexeme vector))
+  ())
+
+(defprop character follow-pos (lexeme vector) 
+  (declare (ignore lexeme vector))
+  ())
+
+(defprop final follow-pos (lexeme vector)
+  (declare (ignore lexeme vector))
+  ())
 
 (defprop or follow-pos (lexeme vector)
   (fill-follow-pos (second lexeme) vector)
@@ -231,14 +173,19 @@
 (defun fill-values (lexeme values next)
   (lexeme-function 'value lexeme values next))
 
-(defprop nil value (lexeme v n) nil)
+(defprop nil value (lexeme v n) 
+  (declare (ignore lexeme v n))
+  nil)
 
 (defprop character value (lexeme v next) 
+  (declare (ignore v))
   (setf (elt next (second lexeme))
 	(first lexeme)))
 
-(defprop final value (lexeme vector n) (setf (elt vector (third lexeme))
-					     (second lexeme)))
+(defprop final value (lexeme vector n)
+  (declare (ignore n))
+  (setf (elt vector (third lexeme))
+	(second lexeme)))
 
 (defprop and value (lexeme value n)
   (fill-values (second lexeme) value n)
@@ -251,7 +198,9 @@
 (defprop star value (lexeme value n)
   (fill-values (second lexeme) value n))
 
-(defstruct state-machine values transitions)
+(defclass state-machine () 
+  ((values :initarg :values)
+   (transitions :initarg :transitions)))
 
 (defun make-state-machine ()
   (make-instance 'state-machine 
@@ -297,7 +246,6 @@
 
 (defun set-state-transitions (state-set lexic machine visited-states)
   (let ((next-states (make-hash-table))
-	(new-states nil)
 	(add-state-funcs (add-state-function state-set machine visited-states)))
     (dolist (state state-set)
       (fill-nexts state lexic next-states))
@@ -319,4 +267,15 @@
     (add-machine-state machine)
     (process-state first-state lexic machine visited-states)
     machine))
+
+(defun machine-next (machine state char)
+  (cdr (assoc char (elt (machine-transitions machine)
+			state))))
+
+(defun machine-value (machine string &optional (state 0) (pos 0))
+  (cond 
+    ((null state) nil)
+     ((= (length string) pos) (elt (machine-values machine) state))
+     (t (machine-value machine string (machine-next machine state (char string pos))
+		                     (1+ pos)))))
       
