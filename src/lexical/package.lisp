@@ -1,6 +1,13 @@
 (defpackage :burning-lexical
   (:use :common-lisp)
-  (:export regular-to-tree
+  (:export make-iterator
+	   eof-p
+	   with-input-iterator
+	   get-next
+	   commit
+	   reset
+           
+           regular-to-tree
            ||
 	   ?
 	   ?repeat
@@ -15,11 +22,15 @@
 
 	   make-lexic
 	   expression
+	   translation
 	   follow-vector
 	   value-vector
 	   next-vector
 	   
 	   deflexic
 	   create-state-machine
-	   machine-values
-	   machine-transitions))
+	   values
+	   transitions
+	   machine-value
+	   get-token
+	   print-stream))

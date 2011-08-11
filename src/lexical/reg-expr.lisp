@@ -1,33 +1,41 @@
 (in-package :burning-lexical)
 
 (defun character-node (char)
-  (list char))
+  "Node containing one character"
+  (list char char))
 
 (defun and-node (left right)
+  "Node representing and expression for left and right"
   (list 'and left right))
 
 (defun star-node (child)
+  "Node representing star expression for child"
   (list 'star (list-to-tree child)))
 
 (defun or-node (left right)
+  "Node representing or expression for left and right"
   (list 'or left right))
 
 (defun maybe-node (child)
+  "Node representing maybe expression for child"
   (or-node () child))
 
 (defun ?repeat-node (child times)
+  "Node representing repetition of child for up to 'times' times"
   (cond
     ((= 0 times) ())
     ((= 1 times) (maybe-node child))
     (t (and-node (?repeat-node child (- times 1)) (maybe-node child)))))
 
 (defun repeat-node (child times)
+  "Node representing repetition of child for 'times' times"
   (cond
     ((= 0 times) ())
     ((= 1 times) child)
     (t (and-node (repeat-node child (- times 1)) child))))
 
 (defun full-repeat-node (child min-times max-times)
+  "Node representing repetition of child for 'min-times' to 'max-times' times"
   (cond 
     ((null max-times) (repeat-node child min-times))
     ((< max-times min-times) (error "Max times in repeat lesser than min times."))
@@ -36,28 +44,30 @@
     (t (and-node (repeat-node child min-times) (?repeat-node child (- max-times min-times))))))
 
 (defun range-node (first last)
-  (let ((value1 (char-code first)) (value2 (char-code last)))
-     (cond ((> value1 value2) (error "First symbol in range greater than last."))
-	   ((= value1 value2) (character-node first))
-           (t (or-node (character-node first) (range-node (character (1+ value1)) last))))))
+  "Node representing character range from 'first' till 'last'"
+  (list first last))
 
 (defun regular-to-tree (expr)
+  "Converts regular expression to parsed tree"
   (cond ((null expr) nil)
         ((consp expr) (list-to-tree expr))
         (t (error "Given regular expression is not list."))))
 
 (defun list-to-tree (expr &optional (node-generator #'and-node))
+  "Converts list of atom regular expressions to parsed tree"
   (cond ((null expr) nil)
         ((null (cdr expr)) (atom-to-tree (car expr)))
         (t (funcall node-generator (atom-to-tree (car expr)) (list-to-tree (cdr expr) node-generator)))))
 
 (defun atom-to-tree (expr)
+  "Converts atom regular expression to parsed tree"
   (cond ((characterp expr) (character-node expr))
         ((stringp expr) (string-to-tree expr))
         ((consp expr) (operation-to-tree expr))
         (t (error "Wrong non-character atom."))))
 
 (defun string-to-tree (string &optional (pos 0))
+  "Converts string expression to parsed tree"
   (cond ((= pos (length string)) ())
         ((= pos (- (length string) 1)) (atom-to-tree (char string pos)))
         (t (and-node (atom-to-tree (char string pos)) (string-to-tree string (1+ pos)))))) 
@@ -93,7 +103,9 @@
 	      (character (third expr))))
 
 (defun operation-to-tree (expr)
+  "Converts operation to parsed tree"
   (parse-operation (car expr) expr))
 
 (defun make-lexeme (name expr)
+  "Makes lexeme with name 'name' and expresison 'expr'"
   (and-node (regular-to-tree expr) (list 'final name)))

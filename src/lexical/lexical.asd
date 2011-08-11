@@ -6,5 +6,6 @@
     :author "Dmitry Sopin <sopindm@gmail.com>"
     :licence "GPL v3"
     :components ((:file "package")
+		 (:file "input" :depends-on ("package"))
                  (:file "reg-expr" :depends-on ("package"))
-		 (:file "lexical" :depends-on ("package" "reg-expr"))))
+		 (:file "lexical" :depends-on ("package" "reg-expr" "input"))))

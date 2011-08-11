@@ -6,17 +6,21 @@
 
 (defun add-positions (lexeme generator)
   (cond ((null lexeme) lexeme)
-	((characterp (first lexeme)) (append lexeme (list (funcall generator))))
+	((integerp (first lexeme)) (append lexeme (list (funcall generator))))
 	((eq (first lexeme) 'final) (append lexeme (list (funcall generator))))
 	(t (cons (first lexeme) (mapcar #'(lambda (x) (add-positions x generator)) (rest lexeme))))))
 
-(defun do-make-lexic (lexemes generator)
+(defun merge-lexemes (lexemes)
   (cond ((null lexemes) ())
-	((null (rest lexemes)) (add-positions (car lexemes) generator))
-	(t (or-node (add-positions (car lexemes) generator) (do-make-lexic (rest lexemes) generator)))))
+	((null (rest lexemes)) (first lexemes))
+	(t (or-node (first lexemes) (merge-lexemes (rest lexemes))))))
+
+(defun do-make-lexic (lexemes generator)
+  (add-positions (merge-lexemes lexemes) generator))
 
 (defclass lexic () 
   ((expression :initarg :expression :accessor expression)
+   (translation :initarg :translation :accessor translation)
    (follow-vector :initarg :follow-vector :accessor follow-vector)
    (value-vector :initarg :value-vector :accessor value-vector)
    (next-vector :initarg :next-vector :accessor next-vector)))
@@ -24,9 +28,73 @@
 (defun make-lexic (&rest lexemes)
   (make-instance 'lexic :lexemes lexemes))
 
+(defun do-split (list char)
+  (let ((head (first list)))
+    (cond
+      ((< (rest head) char) (do-split (rest list) char))
+      ((= (first head) char) t)
+      (t 
+       (let ((new-node (list (cons char (rest head)))))
+	 (setf (rest new-node) (rest list))
+	 (setf (rest list) new-node)
+	 (setf (rest (first list)) (- char 1)))))))
+
+(defun split (translation first last)
+  (do-split translation (char-code first))
+  (do-split translation (1+ (char-code last))))
+
+(defun do-make-translation (expr translation)
+  (cond 
+    ((null expr) t)
+    ((characterp (first expr)) (split translation (first expr) 
+				                  (second expr)))
+    ((eq (first expr) 'final) t)
+    (t (mapc #'(lambda (x) (do-make-translation x translation)) (rest expr)))))
+      
+(defun translation-apply-fun ()
+  (let ((generator (integer-generator 0)))
+    (lambda (range)
+      (list (cons (code-char (first range))
+		  (code-char (rest range)))
+	    (funcall generator)))))
+
+(defun make-translation (lexic)
+  (let ((translation (list (cons -1 (1+ char-code-limit)))))
+    (do-make-translation (expression lexic) translation)
+    (setq translation (butlast (rest translation)))
+    (setq translation (mapcar (translation-apply-fun) translation))
+    (setf (translation lexic) translation)))
+
+(defun translate (char translation)
+  (if (null translation)
+      nil
+      (let ((range (first (first translation)))
+	    (value (second (first translation))))
+	(cond
+	  ((char< char (first range)) nil)
+	  ((char< (rest range) char) (translate char (rest translation)))
+	  (t value)))))
+
+(defun split-ranges (expr translation)
+  (cond 
+    ((null expr) nil)
+    ((characterp (first expr)) (range-to-tree (translate (first expr) translation)
+					      (translate (second expr) translation)))
+    ((eq (first expr) 'final) expr)
+    (t (cons (first expr) (mapcar #'(lambda (x) (split-ranges x translation))
+				  (rest expr))))))
+  
+(defun range-to-tree (first last)
+  (cond ((= first last) (list first))
+	(t (or-node (list first) (range-to-tree (1+ first) last)))))
+
 (defmethod initialize-instance :after ((lexic lexic) &key lexemes)
+  (setf (expression lexic) (merge-lexemes lexemes))
+  (setf (translation lexic) (make-translation lexic))
+  (setf (expression lexic) (split-ranges (expression lexic)
+					 (translation lexic)))
   (let* ((generator (integer-generator 0))
-	 (lex (do-make-lexic lexemes generator))
+	 (lex (add-positions (expression lexic) generator))
 	 (size (funcall generator)))
     (setf (expression lexic) lex)
     (setf (follow-vector lexic) (make-array size :initial-element nil))
@@ -75,6 +143,7 @@
     (cond 
       ((null (car lexeme)) (apply (get nil name) args))
       ((characterp (car lexeme)) (apply (get 'character name) args))
+      ((integerp (car lexeme)) (apply (get 'character name) args))
       (t (apply (get (car lexeme) name) args)))))
 
 (defun nullable (lexeme)
@@ -199,19 +268,60 @@
   (fill-values (second lexeme) value n))
 
 (defclass state-machine () 
-  ((values :initarg :values)
-   (transitions :initarg :transitions)))
+  ((translation :initarg :translation)
+   (values :initarg :values 
+	   :initform (make-array 0 :adjustable t :fill-pointer 0))
+   (transitions :initarg :transitions 
+		:initform (make-array 0 :adjustable t :fill-pointer 0))))
 
-(defun make-state-machine ()
-  (make-instance 'state-machine 
-		 :values (make-array 0 :adjustable t :fill-pointer 0)
-		 :transitions (make-array 0 :adjustable t :fill-pointer 0)))
+(defgeneric (setf translation) (value machine))
+(defgeneric add-state (machine))
+(defgeneric value (machine state))
+(defgeneric (setf value) (value machine state))
+(defgeneric next (machine state code))
+(defgeneric (setf next) (value machine state code))
+(defgeneric first-state (machine))
 
-(defun machine-values (machine)
-  (slot-value machine 'values))
+(defmethod first-state ((machine state-machine))
+  0)
 
-(defun machine-transitions (machine)
-  (slot-value machine 'transitions))
+(defmethod fill-translation (translation first last value)
+  (do ((i first (1+ i)))
+      ((> i last) t)
+    (setf (elt translation i) value)))
+
+(defmethod (setf translation) (value (machine state-machine))    
+  (setf (slot-value machine 'translation)
+	(make-array (1+ (char-code (cdaar (last value)))) :initial-element -1))
+  (dolist (range value)
+    (fill-translation (slot-value machine 'translation)
+		      (char-code (caar range))
+		      (char-code (cdar range))
+		      (second range))))
+
+(defmethod add-state ((machine state-machine))
+  (with-slots (values transitions) machine
+    (vector-push-extend nil values)
+    (vector-push-extend nil transitions)
+    (- (length values) 1)))
+
+(defmethod value ((machine state-machine) state)
+  (elt (slot-value machine 'values) state))
+
+(defmethod (setf value) (value (machine state-machine) state)
+  (setf (elt (slot-value machine 'values) state)
+	value))
+
+(defmethod next ((machine state-machine) state code)
+  (if (null code)
+      nil
+      (cdr (assoc (elt (slot-value machine 'translation) (char-code code))
+		  (elt (slot-value machine 'transitions) 
+		       state)))))
+
+(defmethod (setf next) (value (machine state-machine) state code)
+  (push (cons code value)
+	(elt (slot-value machine 'transitions) state)))
 
 (defun fill-nexts (state lexic table)
   (let ((next (elt (next-vector lexic) state)))
@@ -220,22 +330,18 @@
 	    (make-set (copy-list (elt (follow-vector lexic) state))
 		      (gethash next table))))))
 
-(defun add-machine-state (machine)
-  (vector-push-extend nil (machine-values machine))
-  (vector-push-extend nil (machine-transitions machine))
-  (- (length (machine-values machine)) 1))
-
 (defun add-state-function (state machine visited-states &aux (new-states nil))
   (list 
    (lambda (next next-state)
      (let ((next-state-id (gethash next-state visited-states)))
        (unless next-state-id
-	 (setq next-state-id (add-machine-state machine))
+	 (setq next-state-id (add-state machine))
 	 (push next-state new-states)
 	 (setf (gethash next-state visited-states) next-state-id))
-       (push (cons next next-state-id) 
-	     (elt (machine-transitions machine) 
-		  (gethash state visited-states)))))
+       (setf (next machine 
+		   (gethash state visited-states)
+		   next) 
+	     next-state-id)))
    (lambda () new-states)))
 
 (defun state-value (state-set lexic)
@@ -253,29 +359,43 @@
     (funcall (second add-state-funcs))))
 
 (defun process-state (state lexic machine visited-states &aux next-states)
-  (setf (elt (machine-values machine) (gethash state visited-states))
+  (setf (value machine (gethash state visited-states))
 	(state-value state lexic))
   (setq next-states (set-state-transitions state lexic machine visited-states))
   (dolist (next-state next-states)
     (process-state next-state lexic machine visited-states)))
 
-(defun create-state-machine (lexic)
-  (let ((machine (make-state-machine))
+(defun create-state-machine (lexic &optional (machine-class 'state-machine))
+  (let ((machine (make-instance machine-class))
 	(visited-states (make-hash-table :test 'equal))
 	(first-state (first-pos (expression lexic))))
-    (setf (gethash first-state visited-states) 0)
-    (add-machine-state machine)
+    (setf (gethash first-state visited-states) (add-state machine))
     (process-state first-state lexic machine visited-states)
+    (setf (translation machine) (translation lexic))
     machine))
-
-(defun machine-next (machine state char)
-  (cdr (assoc char (elt (machine-transitions machine)
-			state))))
 
 (defun machine-value (machine string &optional (state 0) (pos 0))
   (cond 
     ((null state) nil)
-     ((= (length string) pos) (elt (machine-values machine) state))
-     (t (machine-value machine string (machine-next machine state (char string pos))
-		                     (1+ pos)))))
-      
+     ((= (length string) pos) (value machine state))
+     (t (machine-value machine string (next machine state (char string pos))
+		       (1+ pos)))))
+
+(defun get-token (iterator machine)
+  (do ((result "")
+       (type nil)
+       (state (first-state machine)))
+      ((null state) (cond ((string= result "") (error "Wrong token ~a" (commit iterator)))
+			  (t (reset iterator) (cons result type))))
+    (when (value machine state)
+      (setq type (value machine state))
+      (setq result (concatenate 'string result (commit iterator))))
+    (setq state (next machine state (get-next iterator)))))
+
+(defun print-stream (iterator machine)
+  (do ()
+      ((eof-p iterator) t)
+    (let ((token (get-token iterator machine)))
+      ())))
+    
+  
