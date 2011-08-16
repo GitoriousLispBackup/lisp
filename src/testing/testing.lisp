@@ -1,3 +1,4 @@
+
 (defpackage :burning-testing
   (:use common-lisp)
   (:export :defcase
@@ -116,6 +117,3 @@
   (dolist (test-case *test-cases*)
     (do-run-case test-case))
   (test-summary))
-
-
-
