@@ -23,7 +23,6 @@
   (with-input-from-string (in "bb")
     (let ((iterator (make-iterator in 1)))
       (!eq (get-next iterator) #\b)
-      (!eq (eof-p iterator) nil)
       (!eq (get-next iterator) #\b)
       (!t (eof-p iterator)))))
 

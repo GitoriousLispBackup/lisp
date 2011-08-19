@@ -6,6 +6,9 @@
 	   get-next
 	   commit
 	   reset
+	   
+	   eval-regular
+	   :char
            
            regular-to-tree
            ||

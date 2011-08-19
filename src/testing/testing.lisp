@@ -9,6 +9,7 @@
 	   :!equal
 	   :!equalp
 	   :!<>
+	   :!error
 	   :run-test
 	   :run-case
 	   :run-tests))
@@ -86,6 +87,22 @@
     `(let ((,value1 ,expr1) (,value2 ,expr2))
        (check (/= ,value1 ,value2)
 	 (format t "~a is ~a. Expected not ~a.~%" ',expr1 ,value1 ',expr2)))))
+
+(defun message (error)
+  (let ((str (make-array 0 :element-type 'base-char
+			 :fill-pointer 0 :adjustable t)))
+    (with-output-to-string (output str)
+      (apply #'format (append (list output (simple-condition-format-control error))
+			      (simple-condition-format-arguments error)))
+      str)))
+	    
+
+(defmacro !error (expression message)
+  `(handler-case
+       (progn ,expression
+	      (check nil (format t "~a failed to die.~%" ',expression)))
+     (simple-error (error)
+       (!equal (message error) ,message))))
 
 (defun prepare-test ()
   (setq *success-tests* 0)

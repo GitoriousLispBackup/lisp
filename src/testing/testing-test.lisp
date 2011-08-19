@@ -37,3 +37,9 @@
 
 (deftest other-testing true ()
   (!t t))
+
+(deftest test-testing ok-error-test ()
+  (!error (error "bla bla") "bla bla"))
+
+(deftest test-testing failed-error-test ()
+  (!error (+ 2 2) "some error"))

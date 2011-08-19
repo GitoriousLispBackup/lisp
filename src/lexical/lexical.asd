@@ -7,5 +7,8 @@
     :licence "GPL v3"
     :components ((:file "package")
 		 (:file "input" :depends-on ("package"))
-                 (:file "reg-expr" :depends-on ("package"))
-		 (:file "lexical" :depends-on ("package" "reg-expr" "input"))))
+		 (:file "core" :depends-on ("package"))
+		 (:file "regular-language" :depends-on ("package" "core"))
+                 (:file "reg-expr" :depends-on ("package" "core"))
+		 (:file "lexical" :depends-on ("package" "reg-expr" "input" "core"))))
+

@@ -7,6 +7,8 @@
     :licence "GPL v3"
     :depends-on (:burning-testing :burning-lexical)
     :components ((:file "package-test")
+		 (:file "core-test" :depends-on ("package-test"))
+		 (:file "regular-language-test" :depends-on ("package-test"))
 		 (:file "input-test" :depends-on ("package-test"))
 		 (:file "reg-expr-test" :depends-on ("package-test"))
 		 (:file "lexical-test" :depends-on ("package-test"))))

@@ -1,21 +1,5 @@
 (in-package :burning-lexical)
 
-(defun character-node (char)
-  "Node containing one character"
-  (list char char))
-
-(defun and-node (left right)
-  "Node representing and expression for left and right"
-  (list 'and left right))
-
-(defun star-node (child)
-  "Node representing star expression for child"
-  (list 'star (list-to-tree child)))
-
-(defun or-node (left right)
-  "Node representing or expression for left and right"
-  (list 'or left right))
-
 (defun maybe-node (child)
   "Node representing maybe expression for child"
   (or-node () child))
@@ -42,10 +26,6 @@
     ((= min-times max-times) (repeat-node child min-times))
     ((= 0 min-times) (?repeat-node child max-times))
     (t (and-node (repeat-node child min-times) (?repeat-node child (- max-times min-times))))))
-
-(defun range-node (first last)
-  "Node representing character range from 'first' till 'last'"
-  (list first last))
 
 (defun regular-to-tree (expr)
   "Converts regular expression to parsed tree"
@@ -78,11 +58,11 @@
      ,@body))
 
 (defoperation * (expr)
-  (star-node (cdr expr)))
+  (star-node (list-to-tree (cdr expr))))
 
 (defoperation + (expr)
   (and-node (list-to-tree (cdr expr))
-	    (star-node (cdr expr))))
+	    (star-node (list-to-tree (cdr expr)))))
 
 (defoperation || (expr)
   (list-to-tree (cdr expr) #'or-node))

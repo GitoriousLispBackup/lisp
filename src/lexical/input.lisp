@@ -14,9 +14,9 @@
   (first buffer))
 
 (defun make-buffer (size stream)
-  (let* ((value (make-array size :element-type 'character))
-	 (size (read-sequence value stream)))
-    (list value size nil)))
+  (let* ((value (make-array (1+ size) :element-type 'character :initial-element #\Null))
+	 (buffer-size (read-sequence value stream :end size)))
+    (list value buffer-size nil)))
 
 (defun read-buffer (buffer stream size)
   (setf (third buffer) (make-buffer size stream)))
@@ -29,7 +29,7 @@
   (cons buffers-list position))
 
 (defun buffer-position (iterator)
-  (the fixnum (rest iterator)))
+  (rest iterator))
 
 (defun (setf buffer-position) (value iterator)
   (setf (rest iterator) value))
@@ -41,13 +41,11 @@
   (setf (first iterator) value))
 
 (defun eol-p (iterator)
-  (declare (optimize (speed 3) (safety 0)))
-  (= (the fixnum (buffer-position iterator))
-     (the fixnum (1- (buffer-size (buffers iterator))))))
+  (>= (buffer-position iterator)
+      (1- (buffer-size (buffers iterator)))))
 
 (defun copy-simple-iterator (iterator)
-  (make-simple-iterator (buffers iterator) 
-			(buffer-position iterator)))
+  (cons (first iterator) (rest iterator)))
 
 (defun move-to-next-buffer (iterator)
   (setf (buffer-position iterator) -1)
@@ -64,17 +62,14 @@
        value))
     (t
      (let ((value (subseq (buffer-value (buffers back))
-			  (1+ (buffer-position back)))))
+			  (1+ (buffer-position back))
+			  (buffer-size (buffers back)))))
        (move-to-next-buffer back)
        (concatenate 'string value (move-to-forward forward back))))))
 
 ;;
 ;; ITERATOR
 ;;
-
-;;buffer 
-;; * data
-;; * max-size
 
 ;;iterator
 ;; * forward : simple iterator
@@ -101,7 +96,7 @@
 
 (defun try-read-buffer (iterator)
   (let ((forward (forward iterator)))
-    (if (= (buffer-position forward) (1- (iterator-buffer-size iterator)))
+    (if (>= (buffer-position forward) (1- (iterator-buffer-size iterator)))
 	(progn
 	  (when (null (buffer-next (buffers forward)))
 	    (read-buffer (buffers forward) (iterator-stream iterator) (iterator-buffer-size iterator)))
@@ -110,7 +105,6 @@
 	nil)))
 
 (defun eof-p (iterator)
-  (declare (optimize (speed 3) (safety 0)))
   (let ((forward (forward iterator)))
     (if (eol-p forward)
         (not (try-read-buffer iterator))
@@ -120,12 +114,18 @@
   `(let ((,iterator (make-iterator ,stream)))
      ,@body))
 
-(defun get-next (iterator)
-  (declare (optimize (speed 3) (safety 0)))
+(defun try-next-buffer (iterator)
   (if (eof-p iterator)
-      nil
-      (aref (the (simple-array character *) (buffer-value (buffers (forward iterator))))
-	    (incf (the fixnum (buffer-position (forward iterator)))))))
+      #\Null
+      (get-next iterator)))
+
+(defun get-next (iterator)
+  (let* ((forward (forward iterator))
+	 (value (aref (buffer-value (buffers forward))
+		      (incf (buffer-position forward)))))
+    (if (char/= value #\Null)
+	value
+	(try-next-buffer iterator))))
 
 (defun reset (iterator)
   (setf (first iterator)
