@@ -13,8 +13,19 @@
   (when (> (length value) 0)
       (error "Node of type ~a has no childs" (type-of node))))
 
+(defgeneric node= (node1 node2))
+(defmethod node=((node1 node) (node2 node))
+  (error "No comparsion method for types ~a and ~a." (type-of node1) (type-of node2)))
+
 (defclass positioned-node (node)
-  ((position :initarg position :accessor node-position)))
+  ((position :initarg :position :initform nil :accessor node-position)))
+
+(defmethod node= ((node1 positioned-node) (node2 positioned-node))
+  (eq (node-position node1) (node-position node2)))
+
+(defgeneric clone-node (node))
+(defmethod clone-node ((node node))
+  (error "Cloning for type ~a not implemented." (type-of node)))
 
 ;;Empty node
 
@@ -23,6 +34,12 @@
 (defun empty-node ()
   (make-instance 'empty-node))
 
+(defmethod node= ((node1 empty-node) (node2 empty-node))
+  t)
+
+(defmethod clone-node ((node empty-node))
+  node)
+
 ;;Final node
 
 (defclass final-node (positioned-node) 
@@ -30,6 +47,16 @@
 
 (defun final-node (lexeme)
   (make-instance 'final-node :lexeme lexeme))
+
+(defmethod print-object ((node final-node) stream)
+  (format stream "#s(final-node :lexeme ~a :position ~a)" (node-lexeme node) (node-position node)))
+
+(defmethod node= ((node1 final-node) (node2 final-node))
+  (and (eq (node-lexeme node1) (node-lexeme node2))
+       (call-next-method)))
+
+(defmethod clone-node ((node final-node))
+  (make-instance 'final-node :lexeme (node-lexeme node) :position (node-position node)))
 
 ;;Range node
 
@@ -45,6 +72,16 @@
   "Node representing character range from 'first' till 'last'"
   (make-instance 'range-node :first first :last last))
 
+(defmethod print-object ((object range-node) stream)
+  (format stream "#s(range-node :first ~a :last ~a)" (range-first object) (range-last object)))
+
+(defmethod node= ((node1 range-node) (node2 range-node))
+  (and (char= (range-first node1) (range-first node2))
+       (char= (range-last node1) (range-last node2))))
+
+(defmethod clone-node ((node range-node))
+  (make-instance 'range-node :first (range-first node) :last (range-last node)))
+
 ;;Integer range node
 
 (defclass integer-range-node (positioned-node)
@@ -53,10 +90,20 @@
 (defun integer-range-node (value)
   (make-instance 'integer-range-node :range value))
 
+(defmethod print-object ((object integer-range-node) stream)
+  (format stream "#s(integer-range-node :value ~a :position ~a)" (range-value object) (node-position object)))
+
+(defmethod node= ((node1 integer-range-node) (node2 integer-range-node))
+  (and (= (range-value node1) (range-value node2))
+       (call-next-method)))
+
+(defmethod clone-node ((node integer-range-node))
+  (make-instance 'integer-range-node :range (range-value node) :position (node-position node)))
+
 ;;Star node
 
 (defclass star-node (node)
-  ((child :initarg :child)))
+  ((child :initarg :child :reader child-node)))
 
 (defun star-node (child)
   "Node representing star expression for child"
@@ -71,11 +118,20 @@
       (setf (slot-value node 'child)
 	    (first value))))
 
+(defmethod node= ((node1 star-node) (node2 star-node))
+  (node= (child-node node1) (child-node node2)))
+
+(defmethod print-object ((node star-node) stream)
+  (format stream "#s(star-node :child ~a)" (child-node node)))
+
+(defmethod clone-node ((node star-node))
+  (make-instance 'star-node :child (clone-node (child-node node))))
+
 ;;Binary node
 
 (defclass binary-node (node)
-  ((left :initarg :left)
-   (right :initarg :right)))
+  ((left :initarg :left :reader left-node)
+   (right :initarg :right :reader right-node)))
 
 (defmethod node-childs ((node binary-node))
   (list (slot-value node 'left)
@@ -87,6 +143,16 @@
       (progn
 	(setf (slot-value node 'left) (first value))
 	(setf (slot-value node 'right) (second value)))))
+
+(defmethod print-object ((object binary-node) stream)
+  (format stream "#s(~a :left ~a :right ~a)" (type-of object) (left-node object) (right-node object)))
+
+(defmethod node= ((node1 binary-node) (node2 binary-node))
+  (and (node= (left-node node1) (left-node node2))
+       (node= (right-node node1) (right-node node2))))
+
+(defmethod clone-node ((node binary-node))
+  (make-instance (class-of node) :left (clone-node (left-node node)) :right (clone-node (right-node node))))
 
 ;;And node
 
@@ -119,8 +185,8 @@
 
 (defun merge-lexemes (lexemes)
   (cond ((null lexemes) ())
-	((null (rest lexemes)) (first lexemes))
-	(t (or-node (first lexemes) (merge-lexemes (rest lexemes))))))
+	((null (rest lexemes)) (clone-node (first lexemes)))
+	(t (or-node (clone-node (first lexemes)) (merge-lexemes (rest lexemes))))))
 
 (defun do-make-lexic (lexemes generator)
   (add-positions (merge-lexemes lexemes) generator))
@@ -203,7 +269,6 @@
   (let* ((generator (integer-generator 0))
 	 (lex (add-positions (expression lexic) generator))
 	 (size (funcall generator)))
-    (setf (expression lexic) lex)
     (setf (follow-vector lexic) (make-array size :initial-element nil))
     (setf (value-vector lexic) (make-array size :initial-element nil))
     (setf (next-vector lexic) (make-array size :initial-element nil))))
@@ -221,29 +286,27 @@
   `(setf (get ',node ',name) 
 	 (lambda ,args ,@body)))
 
-(defprop nil nullable (lexeme)
-  (declare (ignore lexeme))
-  t)
+;;
+;; Nullable
+;;
 
-(defprop character nullable (lexeme)
-  (declare (ignore lexeme))
-  nil)
+(defgeneric nullable (lexeme))
 
-(defprop final nullable (lexeme)
-  (declare (ignore lexeme))
-  nil)
+(defmethod nullable ((lexeme node))
+  (error "No method for type ~a." (type-of lexeme)))
+(defmethod nullable ((lexeme empty-node)) t)
+(defmethod nullable ((lexeme range-node)) nil)
+(defmethod nullable ((lexeme integer-range-node)) nil)
+(defmethod nullable ((lexeme final-node)) nil)
+(defmethod nullable ((lexeme star-node)) t)
 
-(defprop star nullable (lexeme)
-  (declare (ignore lexeme))
-  t)
+(defmethod nullable ((lexeme and-node))
+  (and (nullable (left-node lexeme))
+       (nullable (right-node lexeme))))
 
-(defprop and nullable (lexeme)
-  (and (nullable (second lexeme))
-       (nullable (third lexeme))))
-
-(defprop or nullable (lexeme)
-  (or (nullable (second lexeme))
-      (nullable (third lexeme))))
+(defmethod nullable ((lexeme or-node))
+  (or (nullable (left-node lexeme))
+      (nullable (right-node lexeme))))
   
 (defun lexeme-function (name &rest args)
   (let ((lexeme (car args)))
@@ -253,125 +316,92 @@
       ((integerp (car lexeme)) (apply (get 'character name) args))
       (t (apply (get (car lexeme) name) args)))))
 
-(defun nullable (lexeme)
-  (lexeme-function 'nullable lexeme))
-
 (defun make-set (first second)
   (sort (copy-list (union first second)) #'<))
 
-(defprop nil first-pos (lexeme) 
-  (declare (ignore lexeme))
+;;
+;;First pos
+;;
+
+(defgeneric first-pos (lexeme))
+
+(defmethod first-pos ((lexeme empty-node)) ())
+(defmethod first-pos ((lexeme positioned-node)) (list (node-position lexeme)))
+
+(defmethod first-pos ((lexeme and-node))
+  (if (nullable (left-node lexeme))
+      (make-set (first-pos (left-node lexeme))
+		(first-pos (right-node lexeme)))
+      (first-pos (left-node lexeme))))
+
+(defmethod first-pos ((lexeme or-node))
+  (make-set (first-pos (left-node lexeme))
+	    (first-pos (right-node lexeme))))
+
+(defmethod first-pos ((lexeme star-node))
+  (first-pos (child-node lexeme)))
+
+;;
+;;Last pos
+;;
+
+(defgeneric last-pos (lexeme))
+
+(defmethod last-pos ((lexeme empty-node))
   ())
 
-(defprop character first-pos (lexeme) 
-  (list (second lexeme)))
+(defmethod last-pos ((lexeme positioned-node))
+  (list (node-position lexeme)))
 
-(defprop final first-pos (lexeme)
-  (list (third lexeme)))
+(defmethod last-pos ((lexeme and-node))
+  (if (nullable (right-node lexeme))
+      (make-set (last-pos (left-node lexeme))
+		(last-pos (right-node lexeme)))
+      (last-pos (right-node lexeme))))
 
-(defprop and first-pos (lexeme)
-  (if (nullable (second lexeme))
-      (make-set (first-pos (second lexeme)) (first-pos (third lexeme)))
-      (first-pos (second lexeme))))
+(defmethod last-pos ((lexeme or-node))
+  (make-set (last-pos (left-node lexeme))
+	    (last-pos (right-node lexeme))))
 
-(defprop or first-pos (lexeme)
-  (make-set (first-pos (second lexeme))
-	    (first-pos (third lexeme))))
+(defmethod last-pos ((lexeme star-node))
+  (last-pos (child-node lexeme)))
 
-(defprop star first-pos (lexeme)
-  (first-pos (second lexeme)))
+;
+;Follow-pos
+;
 
-(defun first-pos (lexeme)
-  (lexeme-function 'first-pos lexeme))
+(defgeneric fill-follow-pos (lexeme vector))
 
-(defprop nil last-pos (lexeme) 
-  (declare (ignore lexeme))
-  ())
-
-(defprop character last-pos (lexeme)
-  (list (second lexeme)))
-
-(defprop final last-pos (lexeme)
-  (list (third lexeme)))
-
-(defprop and last-pos (lexeme)
-  (if (nullable (third lexeme))
-      (make-set (last-pos (second lexeme)) (last-pos (third lexeme)))
-      (last-pos (third lexeme))))
-
-(defprop or last-pos (lexeme)
-  (make-set (last-pos (second lexeme))
-	    (last-pos (third lexeme))))
-
-(defprop star last-pos (lexeme)
-  (last-pos (second lexeme)))
-
-(defun last-pos (lexeme)
-  (lexeme-function 'last-pos lexeme))
-
-(defprop nil follow-pos (lexeme vector) 
-  (declare (ignore lexeme vector))
-  ())
-
-(defprop character follow-pos (lexeme vector) 
-  (declare (ignore lexeme vector))
-  ())
-
-(defprop final follow-pos (lexeme vector)
-  (declare (ignore lexeme vector))
-  ())
-
-(defprop or follow-pos (lexeme vector)
-  (fill-follow-pos (second lexeme) vector)
-  (fill-follow-pos (third lexeme) vector))
-
-(defprop and follow-pos (lexeme vector)
-  (let ((fst (first-pos (third lexeme)))
-	(lst (last-pos (second lexeme))))
-    (set-vector lst fst vector))
-  (fill-follow-pos (second lexeme) vector)
-  (fill-follow-pos (third lexeme) vector))
+(defmethod fill-follow-pos ((lexeme node) vector)
+  (mapc #'(lambda (x) (fill-follow-pos x vector)) (node-childs lexeme)))
 
 (defun set-vector (positions values vector)
   (dolist (position positions)
     (setf (elt vector position) 
 	  (make-set (elt vector position) values))))
 
-(defprop star follow-pos (lexeme vector)
-  (let ((fst (first-pos (second lexeme)))
-	(lst (last-pos (second lexeme))))
+(defmethod fill-follow-pos ((lexeme and-node) vector)
+  (let ((fst (first-pos (right-node lexeme)))
+	(lst (last-pos (left-node lexeme))))
     (set-vector lst fst vector))
-  (fill-follow-pos (second lexeme) vector))
+  (call-next-method))
 
-(defun fill-follow-pos (lexeme vector)
-  (lexeme-function 'follow-pos lexeme vector))
+(defmethod fill-follow-pos ((lexeme star-node) vector)
+  (let ((fst (first-pos (child-node lexeme)))
+	(lst (last-pos (child-node lexeme))))
+    (set-vector lst fst vector))
+  (call-next-method))
 
-(defun fill-values (lexeme values next)
-  (lexeme-function 'value lexeme values next))
+(defgeneric fill-values (lexeme value-vector next-vector))
 
-(defprop nil value (lexeme v n) 
-  (declare (ignore lexeme v n))
-  nil)
+(defmethod fill-values ((lexeme node) v n)
+  (mapc #'(lambda(x) (fill-values x v n)) (node-childs lexeme)))
 
-(defprop character value (lexeme v next) 
-  (declare (ignore v))
-  (setf (elt next (second lexeme))
-	(first lexeme)))
+(defmethod fill-values ((lexeme integer-range-node) v next-vector)
+  (setf (elt next-vector (node-position lexeme))
+	(range-value lexeme)))
 
-(defprop final value (lexeme vector n)
-  (declare (ignore n))
-  (setf (elt vector (third lexeme))
-	(second lexeme)))
-
-(defprop and value (lexeme value n)
-  (fill-values (second lexeme) value n)
-  (fill-values (third lexeme) value n))
-
-(defprop or value (lexeme value n)
-  (fill-values (second lexeme) value n)
-  (fill-values (third lexeme) value n))
-
-(defprop star value (lexeme value n)
-  (fill-values (second lexeme) value n))
-
+(defmethod fill-values ((lexeme final-node) value-vector n)
+  (setf (elt value-vector (node-position lexeme))
+	(node-lexeme lexeme)))
 

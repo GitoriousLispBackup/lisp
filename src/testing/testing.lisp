@@ -5,6 +5,7 @@
 	   :deftest
 	   :!t
 	   :!=
+	   :equal-check
 	   :!eq
 	   :!equal
 	   :!equalp

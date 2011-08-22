@@ -10,5 +10,5 @@
 		 (:file "core" :depends-on ("package"))
 		 (:file "regular-language" :depends-on ("package" "core"))
                  (:file "reg-expr" :depends-on ("package" "core"))
-		 (:file "lexical" :depends-on ("package" "reg-expr" "input" "core"))))
+		 (:file "state-machine" :depends-on ("package" "reg-expr" "input" "core"))))
 

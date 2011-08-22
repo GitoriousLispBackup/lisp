@@ -1,6 +1,6 @@
 (in-package :burning-lexical-test)
 
-(defcase lexical-test)
+(defcase state-machine-test)
 
 (deflexeme if ("if"))
 (deflexeme then ("then"))
@@ -12,7 +12,7 @@
 (deflexic sample-lexic (make-lexeme 'sample '((* (- "a" "b")) "abb")))
 (deflexic my-lexic if then word integer spaces r-word)
 
-(deftest lexical-test state-machine-creating ()
+(deftest state-machine-test state-machine-creating ()
   (let ((machine (create-state-machine sample-lexic)))
     (!equalp (slot-value machine 'values)
 	     #(nil nil nil sample))
@@ -22,7 +22,7 @@
 	       ((0 . 1) (1 . 3))
 	       ((0 . 1) (1 . 0))))))
 
-(deftest lexical-test state-machine-value ()
+(deftest state-machine-test state-machine-value ()
   (let ((machine (create-state-machine my-lexic)))
     (!eq (machine-value machine "if") 'if)
     (!eq (machine-value machine "then") 'then)
@@ -33,3 +33,4 @@
     (!eq (machine-value machine "анализатор") 'r-word)
     (!eq (machine-value machine "") 'spaces)
     (!eq (machine-value machine "    ") 'spaces)))
+

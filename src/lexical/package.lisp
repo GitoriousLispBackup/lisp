@@ -6,6 +6,15 @@
 	   get-next
 	   commit
 	   reset
+
+	   character-node
+	   range-node
+	   final-node
+	   empty-node
+	   star-node
+	   and-node
+	   or-node
+	   node=
 	   
 	   eval-regular
 	   :char

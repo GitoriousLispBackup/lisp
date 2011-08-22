@@ -2,9 +2,6 @@
 
 (defcase reglang-test)
 
-(defun range-node (char1 char2)
-  (list char1 char2))
-
 (defun char-node (char)
   (range-node char char))
 
@@ -29,7 +26,7 @@
     (get-output-stream-string output)))
 
 (deftest reglang-test char-test ()
-  (!equal (eval-regular '(:char #\a))
+  (!node= (eval-regular '(:char #\a))
 	  (char-node #\a))
   (!error (eval-regular '(:char))
 	  (no-enought-parameters-error ':char))
@@ -39,7 +36,7 @@
 	  (wrong-type-error ':char 0 'character (type-of 1))))
 
 (deftest reglang-test range-test ()
-  (!equal (eval-regular '(:range #\a #\b))
+  (!node= (eval-regular '(:range #\a #\b))
 	  (range-node #\a #\b))
   (!error (eval-regular '(:range #\a))
 	  (no-enought-parameters-error ':range))
