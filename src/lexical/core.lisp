@@ -1,37 +1,121 @@
 (in-package :burning-lexical)
 
-(defun empty-node ()
+;;Base node class
+
+(defclass node () ())
+
+(defgeneric node-childs (node))
+(defmethod node-childs ((node node))
   ())
+
+(defgeneric (setf node-childs) (value node))
+(defmethod (setf node-childs) (value node)
+  (when (> (length value) 0)
+      (error "Node of type ~a has no childs" (type-of node))))
+
+(defclass positioned-node (node)
+  ((position :initarg position :accessor node-position)))
+
+;;Empty node
+
+(defclass empty-node (node) ())
+
+(defun empty-node ()
+  (make-instance 'empty-node))
+
+;;Final node
+
+(defclass final-node (positioned-node) 
+  ((lexeme :initarg :lexeme :accessor node-lexeme)))
+
+(defun final-node (lexeme)
+  (make-instance 'final-node :lexeme lexeme))
+
+;;Range node
+
+(defclass range-node (node)
+  ((first :initarg :first :reader range-first)
+   (last :initarg :last :reader range-last)))
 
 (defun character-node (char)
   "Node containing one character"
-  (list char char))
+  (make-instance 'range-node :first char :last char))
 
 (defun range-node (first last)
   "Node representing character range from 'first' till 'last'"
-  (list first last))
+  (make-instance 'range-node :first first :last last))
 
-(defun and-node (left right)
-  "Node representing and expression for left and right"
-  (list 'and left right))
+;;Integer range node
+
+(defclass integer-range-node (positioned-node)
+  ((range :initarg :range :reader range-value)))
+
+(defun integer-range-node (value)
+  (make-instance 'integer-range-node :range value))
+
+;;Star node
+
+(defclass star-node (node)
+  ((child :initarg :child)))
 
 (defun star-node (child)
   "Node representing star expression for child"
-  (list 'star child))
+  (make-instance 'star-node :child child))
+
+(defmethod node-childs ((node star-node))
+  (list (slot-value node 'child)))
+
+(defmethod (setf node-childs) (value (node star-node))
+  (if (/= (length value) 1)
+      (error "Star node has only one child.")
+      (setf (slot-value node 'child)
+	    (first value))))
+
+;;Binary node
+
+(defclass binary-node (node)
+  ((left :initarg :left)
+   (right :initarg :right)))
+
+(defmethod node-childs ((node binary-node))
+  (list (slot-value node 'left)
+	(slot-value node 'right)))
+
+(defmethod (setf node-childs) (value (node binary-node))
+  (if (/= (length value) 2)
+      (error "Binary node has 2 childs.")
+      (progn
+	(setf (slot-value node 'left) (first value))
+	(setf (slot-value node 'right) (second value)))))
+
+;;And node
+
+(defclass and-node (binary-node)())
+
+(defun and-node (left right)
+  "Node representing and expression for left and right"
+  (make-instance 'and-node :left left :right right))
+
+;;Or node
+
+(defclass or-node (binary-node)())
 
 (defun or-node (left right)
   "Node representing or expression for left and right"
-  (list 'or left right))
+  (make-instance 'or-node :left left :right right))
+
+;;Etc
 
 (defun integer-generator (n)
   (decf n)
   (lambda () (incf n)))
 
-(defun add-positions (lexeme generator)
-  (cond ((null lexeme) lexeme)
-	((integerp (first lexeme)) (append lexeme (list (funcall generator))))
-	((eq (first lexeme) 'final) (append lexeme (list (funcall generator))))
-	(t (cons (first lexeme) (mapcar #'(lambda (x) (add-positions x generator)) (rest lexeme))))))
+(defgeneric add-positions (lexeme number-generator))
+(defmethod add-positions ((lexeme node) generator)
+  (mapc #'(lambda (x) (add-positions x generator)) (node-childs lexeme)))
+
+(defmethod add-positions :after ((lexeme positioned-node) generator)
+  (setf (node-position lexeme) (funcall generator)))
 
 (defun merge-lexemes (lexemes)
   (cond ((null lexemes) ())
@@ -66,14 +150,13 @@
   (do-split translation (char-code first))
   (do-split translation (1+ (char-code last))))
 
-(defun do-make-translation (expr translation)
-  (cond 
-    ((null expr) t)
-    ((characterp (first expr)) (split translation (first expr) 
-				                  (second expr)))
-    ((eq (first expr) 'final) t)
-    (t (mapc #'(lambda (x) (do-make-translation x translation)) (rest expr)))))
-      
+(defgeneric do-make-translation (node translation))
+(defmethod do-make-translation ((node node) translation)
+  (mapc #'(lambda (x) (do-make-translation x translation)) (node-childs node)))
+
+(defmethod do-make-translation ((node range-node) translation)
+  (split translation (range-first node) (range-last node)))
+
 (defun translation-apply-fun ()
   (let ((generator (integer-generator 0)))
     (lambda (range)
@@ -98,18 +181,19 @@
 	  ((char< (rest range) char) (translate char (rest translation)))
 	  (t value)))))
 
-(defun split-ranges (expr translation)
-  (cond 
-    ((null expr) nil)
-    ((characterp (first expr)) (range-to-tree (translate (first expr) translation)
-					      (translate (second expr) translation)))
-    ((eq (first expr) 'final) expr)
-    (t (cons (first expr) (mapcar #'(lambda (x) (split-ranges x translation))
-				  (rest expr))))))
-  
+(defgeneric split-ranges (expr translation))
+(defmethod split-ranges (expr translation)
+  (setf (node-childs expr)
+	(mapcar #'(lambda (x) (split-ranges x translation)) (node-childs expr)))
+  expr)
+
+(defmethod split-ranges ((expr range-node) translation)
+  (range-to-tree (translate (range-first expr) translation)
+		 (translate (range-last expr) translation)))
+
 (defun range-to-tree (first last)
-  (cond ((= first last) (list first))
-	(t (or-node (list first) (range-to-tree (1+ first) last)))))
+  (cond ((= first last) (integer-range-node first))
+	(t (or-node (integer-range-node first) (range-to-tree (1+ first) last)))))
 
 (defmethod initialize-instance :after ((lexic lexic) &key lexemes)
   (setf (expression lexic) (merge-lexemes lexemes))

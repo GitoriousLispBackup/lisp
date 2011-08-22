@@ -2,7 +2,7 @@
 
 (defun maybe-node (child)
   "Node representing maybe expression for child"
-  (or-node () child))
+  (or-node (empty-node) child))
 
 (defun ?repeat-node (child times)
   "Node representing repetition of child for up to 'times' times"
@@ -88,4 +88,4 @@
 
 (defun make-lexeme (name expr)
   "Makes lexeme with name 'name' and expresison 'expr'"
-  (and-node (regular-to-tree expr) (list 'final name)))
+  (and-node (regular-to-tree expr) (final-node name)))
