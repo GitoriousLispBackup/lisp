@@ -72,6 +72,9 @@
   "Node representing character range from 'first' till 'last'"
   (make-instance 'range-node :first first :last last))
 
+(defun any-character-node ()
+  (range-node (code-char 0) (code-char (1- char-code-limit))))
+  
 (defmethod print-object ((object range-node) stream)
   (format stream "#s(range-node :first ~a :last ~a)" (range-first object) (range-last object)))
 

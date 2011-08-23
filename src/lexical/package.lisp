@@ -16,8 +16,9 @@
 	   or-node
 	   node=
 	   
-	   eval-regular
-	   :char
+	   to-range-set
+	   en
+	   ru
            
            regular-to-tree
            ||
