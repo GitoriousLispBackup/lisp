@@ -7,26 +7,28 @@
 	   commit
 	   reset
 
+	   oequal
 	   character-node
 	   range-node
 	   final-node
 	   empty-node
 	   star-node
+	   left-node
+	   right-node
 	   and-node
 	   or-node
 	   node=
+
+	   parse-regular
 	   
 	   to-range-set
+	   lexeme
+	   make-lexeme
+	   lexeme-name
+	   lexeme-expression
+	   deflexeme
 	   en
 	   ru
-           
-           regular-to-tree
-           ||
-	   ?
-	   ?repeat
-	   repeat
-	   make-lexeme
-	   deflexeme
 
 	   lexic
 	   nullable

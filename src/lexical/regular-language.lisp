@@ -176,3 +176,43 @@
 
 (defun :maybe (expr)
   (:or (:empty) expr))
+
+(defclass lexeme ()
+  ((name :initarg :name :reader lexeme-name)
+   (expression :initarg :expression :reader lexeme-expression)
+   (minimalp :initarg :minimalp :initform nil :reader lexeme-minimal-p)
+   (skippedp :initarg :skippedp :initform nil :reader lexeme-skipped-p)))
+
+(defmethod lexeme-name ((object (eql nil)))
+  nil)
+
+(defmethod lexeme-minimal-p ((object (eql nil)))
+  nil)
+
+(defmethod oequal ((l1 lexeme) (l2 lexeme))
+  (and (eq (lexeme-name l1) (lexeme-name l2))
+       (eq (lexeme-expression l1) (lexeme-expression l2))
+       (eq (lexeme-minimal-p l1) (lexeme-minimal-p l2))
+       (eq (lexeme-skipped-p l1) (lexeme-skipped-p l2))))
+
+(defmethod print-object ((object lexeme) stream)
+  (format stream "#s(lexeme :name ~a :expression ~a :minimalp ~a :skipped ~a)" 
+	  (lexeme-name object) 
+	  (lexeme-expression object)
+	  (lexeme-minimal-p object)
+	  (lexeme-skipped-p object)))
+
+(defgeneric lexeme-to-node (object))
+(defmethod lexeme-to-node ((lexeme lexeme))
+  (:and (lexeme-expression lexeme) (final-node lexeme)))
+
+(defun make-lexeme (name expression &key (minimal nil) (skipped nil))
+  (make-instance 'lexeme 
+		 :expression expression
+		 :name name  
+		 :minimalp minimal 
+		 :skippedp skipped))
+
+(defmacro deflexeme (name expression &key (minimal nil) (skipped nil))
+  `(defparameter ,name (make-lexeme ',name ,expression 
+				    ,@(when minimal '(:minimal t)) ,@(when skipped '(:skipped t)))))

@@ -1,5 +1,13 @@
 (in-package :burning-lexical)
 
+(defgeneric oequal (o1 o2))
+(defmethod oequal (o1 o2)
+  (equalp o1 o2))
+
+(defmethod oequal ((o1 sequence) (o2 sequence))
+  (cond	((not (eq (length o1) (length o2))) nil)
+	(t (eval (cons 'and (map 'list #'oequal o1 o2))))))
+
 ;;Base node class
 
 (defclass node () ())
@@ -15,7 +23,7 @@
 
 (defgeneric node= (node1 node2))
 (defmethod node=((node1 node) (node2 node))
-  (error "No comparsion method for types ~a and ~a." (type-of node1) (type-of node2)))
+  nil)
 
 (defclass positioned-node (node)
   ((position :initarg :position :initform nil :accessor node-position)))
@@ -52,11 +60,13 @@
   (format stream "#s(final-node :lexeme ~a :position ~a)" (node-lexeme node) (node-position node)))
 
 (defmethod node= ((node1 final-node) (node2 final-node))
-  (and (eq (node-lexeme node1) (node-lexeme node2))
+  (and (oequal (node-lexeme node1) (node-lexeme node2))
        (call-next-method)))
 
 (defmethod clone-node ((node final-node))
-  (make-instance 'final-node :lexeme (node-lexeme node) :position (node-position node)))
+  (make-instance 'final-node 
+		 :lexeme (node-lexeme node) 
+		 :position (node-position node)))
 
 ;;Range node
 
@@ -188,8 +198,8 @@
 
 (defun merge-lexemes (lexemes)
   (cond ((null lexemes) ())
-	((null (rest lexemes)) (clone-node (first lexemes)))
-	(t (or-node (clone-node (first lexemes)) (merge-lexemes (rest lexemes))))))
+	((null (rest lexemes)) (clone-node (lexeme-to-node (first lexemes))))
+	(t (or-node (clone-node (lexeme-to-node (first lexemes))) (merge-lexemes (rest lexemes))))))
 
 (defun do-make-lexic (lexemes generator)
   (add-positions (merge-lexemes lexemes) generator))
@@ -275,9 +285,6 @@
     (setf (follow-vector lexic) (make-array size :initial-element nil))
     (setf (value-vector lexic) (make-array size :initial-element nil))
     (setf (next-vector lexic) (make-array size :initial-element nil))))
-
-(defmacro deflexeme (name value)
-  `(defparameter ,name (make-lexeme ',name ',value)))
 
 (defmacro deflexic (name &rest lexemes)
   `(progn
@@ -405,6 +412,7 @@
 	(range-value lexeme)))
 
 (defmethod fill-values ((lexeme final-node) value-vector n)
-  (setf (elt value-vector (node-position lexeme))
-	(node-lexeme lexeme)))
+  (let ((value (node-lexeme lexeme)))
+    (setf (elt value-vector (node-position lexeme))
+	  value)))
 

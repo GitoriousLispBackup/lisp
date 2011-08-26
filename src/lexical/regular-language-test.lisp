@@ -109,3 +109,14 @@
   (!node= (:repeat (:char #\a) 1 2)
 	  (and-node (character-node #\a)
 		    (or-node (empty-node) (character-node #\a)))))
+
+(deftest reglang-test make-lexeme-test ()
+  (let ((lexeme (make-lexeme 'bla-bla (:and (:empty) (:empty)) :minimal t)))
+    (!node= (lexeme-expression lexeme)
+	    (and-node (empty-node) (empty-node)))))
+
+(deftest reglang-test deflexeme-test ()
+  (!equal (macroexpand-1 '(deflexeme if ("if")))
+	  '(defparameter if (make-lexeme 'if ("if"))))
+  (!equal (macroexpand-1 '(deflexeme if ("if") :minimal t))
+	  '(defparameter if (make-lexeme 'if ("if") :minimal t))))

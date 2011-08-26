@@ -10,5 +10,5 @@
 		 (:file "core-test" :depends-on ("package-test"))
 		 (:file "regular-language-test" :depends-on ("package-test" "core-test"))
 		 (:file "input-test" :depends-on ("package-test"))
-		 (:file "reg-expr-test" :depends-on ("package-test" "core-test"))
-		 (:file "state-machine-test" :depends-on ("package-test"))))
+		 (:file "state-machine-test" :depends-on ("package-test" "core-test"))
+		 (:file "regular-parser-test" :depends-on ("package-test" "core-test"))))
