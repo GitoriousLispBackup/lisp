@@ -117,6 +117,6 @@
 
 (deftest reglang-test deflexeme-test ()
   (!equal (macroexpand-1 '(deflexeme if ("if")))
-	  '(defparameter if (make-lexeme 'if ("if"))))
+	  '(setf (get 'if 'lexeme) (make-lexeme 'if ("if"))))
   (!equal (macroexpand-1 '(deflexeme if ("if") :minimal t))
-	  '(defparameter if (make-lexeme 'if ("if") :minimal t))))
+	  '(setf (get 'if 'lexeme) (make-lexeme 'if ("if") :minimal t))))

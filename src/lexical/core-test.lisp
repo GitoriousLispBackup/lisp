@@ -23,9 +23,9 @@
 		     (and-node (and-node (irange-node 3 3) (irange-node 1 4)) 
 			       (p-final-node lexeme2 5))))
     (!equalp (translation lexic) '(((#\1 . #\1) 0) ((#\2 . #\2) 1) ((#\3 . #\r) 2) ((#\s . #\s) 3)))
-    (!equalp (follow-vector lexic) (make-array 6))
-    (!equalp (value-vector lexic) (make-array 6))
-    (!equalp (next-vector lexic) (make-array 6))))
+    (!equalp (follow-vector lexic) (make-array 6 :initial-element nil))
+    (!equalp (value-vector lexic) (make-array 6 :initial-element nil))
+    (!equalp (next-vector lexic) (make-array 6 :initial-element nil))))
 
 
 (deftest core-test nullable-test ()
@@ -55,17 +55,22 @@
 (deflexeme spaces (:star (:char #\Space)))
 (deflexeme r-word (:positive (:letter :no-upper t :languages '(ru))))
 
+(defun get-lexeme (name)
+  (get name 'lexeme))
+(defun get-lexeme-expression (name)
+  (expression (make-lexic (get name 'lexeme))))
+
 (deftest core-test first-test ()
-  (!equal (first-pos (expression (make-lexic if))) '(0))
-  (!equal (first-pos (expression (make-lexic word))) '(0))
-  (!equal (first-pos (expression (make-lexic integer))) '(0 1 2))
-  (!equal (first-pos (expression (make-lexic spaces))) '(0 1)))
+  (!equal (first-pos (get-lexeme-expression 'if)) '(0))
+  (!equal (first-pos (get-lexeme-expression 'word)) '(0))
+  (!equal (first-pos (get-lexeme-expression 'integer)) '(0 1 2))
+  (!equal (first-pos (get-lexeme-expression 'spaces)) '(0 1)))
 
 (deftest core-test last-test ()
-  (!equal (last-pos (expression (make-lexic if))) '(2))
-  (!equal (last-pos (left-node (expression (make-lexic word))))
+  (!equal (last-pos (get-lexeme-expression 'if)) '(2))
+  (!equal (last-pos (left-node (get-lexeme-expression 'word)))
 	  '(0 1))
-  (!equal (last-pos (left-node (expression (make-lexic integer))))
+  (!equal (last-pos (left-node (get-lexeme-expression 'integer)))
 	  '(2 3)))
 
 (deflexeme sample-lexeme (:and (:star (:range #\a #\b))
@@ -90,10 +95,10 @@
 			      (and-node (irange-node 0 2) 
 					(and-node (irange-node 1 3) 
 						  (irange-node 1 4))))
-		    (p-final-node sample-lexeme 5)))
+		    (p-final-node (get-lexeme 'sample-lexeme) 5)))
   (!equalp (follow-vector sample-lexic) #((0 1 2) (0 1 2) (3) (4) (5) ()))
   (!oequal (value-vector sample-lexic) 
-	   (list nil nil nil nil nil sample-lexeme))
+	   (list nil nil nil nil nil (get-lexeme 'sample-lexeme)))
   (!equalp (next-vector sample-lexic) #(0 1 0 1 1 nil)))
 
 (deflexeme c-string (:and (:char #\")
@@ -104,4 +109,4 @@
 
 (deftest core-test minimal-lexic ()
   (!oequal (value-vector min-lexic) 
-	   (list nil nil nil nil nil nil c-string)))
+	   (list nil nil nil nil nil nil (get-lexeme 'c-string))))

@@ -129,8 +129,7 @@
 
 (defun get-token (iterator machine)
   (declare (optimize (speed 3) (safety 0)))
-  (do ((result "")
-       (type nil)
+  (do ((type nil)
        (state (first-state machine))
        (safed-iterator (copy-simple-iterator (back iterator))))
       ((null state) (return-token iterator safed-iterator machine type))
@@ -142,10 +141,5 @@
 	  (setq state nil)
 	  (setq state (next machine state next-value))))))
 
-(defun print-stream (iterator machine)
-  (do ()
-      ((eof-p iterator) t)
-    (let ((token (get-token iterator machine)))
-      ())))
     
   

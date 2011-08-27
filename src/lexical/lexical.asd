@@ -9,5 +9,4 @@
 		 (:file "input" :depends-on ("package"))
 		 (:file "core" :depends-on ("package"))
 		 (:file "regular-language" :depends-on ("package" "core"))
-		 (:file "state-machine" :depends-on ("package" "input" "core" "regular-language"))
-		 (:file "regular-parser" :depends-on ("package" "regular-language"))))
+		 (:file "state-machine" :depends-on ("package" "input" "core" "regular-language"))))

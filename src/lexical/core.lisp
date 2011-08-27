@@ -280,21 +280,17 @@
   (setf (expression lexic) (split-ranges (expression lexic)
 					 (translation lexic)))
   (let* ((generator (integer-generator 0))
-	 (lex (add-positions (expression lexic) generator))
-	 (size (funcall generator)))
+	 (size (progn (add-positions (expression lexic) generator)
+		      (funcall generator))))
     (setf (follow-vector lexic) (make-array size :initial-element nil))
     (setf (value-vector lexic) (make-array size :initial-element nil))
     (setf (next-vector lexic) (make-array size :initial-element nil))))
 
 (defmacro deflexic (name &rest lexemes)
   `(progn
-     (defparameter ,name (make-lexic ,@lexemes))
+     (defparameter ,name (make-lexic ,@(mapcar #'(lambda (x) `(get ',x 'lexeme)) lexemes)))
      (fill-follow-pos (expression ,name) (follow-vector ,name))
      (fill-values (expression ,name) (slot-value ,name 'value-vector) (slot-value ,name 'next-vector))))
-
-(defmacro defprop (node name args &body body)
-  `(setf (get ',node ',name) 
-	 (lambda ,args ,@body)))
 
 ;;
 ;; Nullable
@@ -408,10 +404,12 @@
   (mapc #'(lambda(x) (fill-values x v n)) (node-childs lexeme)))
 
 (defmethod fill-values ((lexeme integer-range-node) v next-vector)
+  (declare (ignore v))
   (setf (elt next-vector (node-position lexeme))
 	(range-value lexeme)))
 
 (defmethod fill-values ((lexeme final-node) value-vector n)
+  (declare (ignore n))
   (let ((value (node-lexeme lexeme)))
     (setf (elt value-vector (node-position lexeme))
 	  value)))

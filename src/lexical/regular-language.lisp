@@ -214,5 +214,5 @@
 		 :skippedp skipped))
 
 (defmacro deflexeme (name expression &key (minimal nil) (skipped nil))
-  `(defparameter ,name (make-lexeme ',name ,expression 
-				    ,@(when minimal '(:minimal t)) ,@(when skipped '(:skipped t)))))
+  `(setf (get ',name 'lexeme) (make-lexeme ',name ,expression 
+					  ,@(when minimal '(:minimal t)) ,@(when skipped '(:skipped t)))))
