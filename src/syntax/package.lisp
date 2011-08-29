@@ -3,4 +3,5 @@
   (:export make-rule
 	   rule-productions
 	   rule-result
+	   aux-rules
 	   ||))
