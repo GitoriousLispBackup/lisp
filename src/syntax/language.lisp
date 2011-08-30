@@ -1,10 +1,5 @@
 (in-package :burning-syntax)
 
-(defclass rule ()
-  ((productions :initarg :productions :accessor rule-productions)
-   (result :initarg :result :reader rule-result)
-   (aux-rules :initform () :accessor aux-rules)))
-
 (defun append-production (production productions)
   (mapcar #'(lambda (x) (append production x)) productions))
 

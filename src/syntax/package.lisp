@@ -4,4 +4,8 @@
 	   rule-productions
 	   rule-result
 	   aux-rules
-	   ||))
+
+	   make-grammar
+	   grammar-productions
+	   grammar-terminals
+	   grammar-non-terminals))

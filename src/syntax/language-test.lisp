@@ -2,16 +2,6 @@
 
 (defcase language-test)
 
-(defun !symbol= (symbol1 symbol2)
-  (cond
-    ((eq symbol1 ':gensym) t)
-    ((eq symbol2 ':gensym) t)
-    (t (!equal symbol1 symbol2))))
-
-(defun !production= (prod1 prod2)
-  (!= (length prod1) (length prod2))
-  (mapc #'!symbol= prod1 prod2))
-
 (defun !rule= (rule result &rest arguments)
   (let ((productions (remove-if #'(lambda (x) (eq (first x) ':aux)) arguments))
 	(aux (remove-if-not #'(lambda (x) (eq (first x) ':aux)) arguments)))
