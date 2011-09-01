@@ -116,13 +116,18 @@
      (t (machine-value machine string (next machine state (char string pos))
 		       (1+ pos)))))
 
+(deflexeme :eps (:empty))
+
+(defun eof-token ()
+  `("" . ,(get ':eps 'lexeme)))
+
 (defun return-token (iterator safed-iterator machine type)
   (cond ((equal safed-iterator (back iterator)) (error "Wrong token ~a" (commit iterator)))
 	((lexeme-skipped-p type) 
 	 (setf (first iterator) safed-iterator)
 	 (commit iterator)
 	 (if (eof-p iterator) 
-	     nil
+	     (eof-token)
 	     (get-token iterator machine)))
 	(t (setf (first iterator) safed-iterator)
 	   (cons (commit iterator) type))))
@@ -141,5 +146,7 @@
 	  (setq state nil)
 	  (setq state (next machine state next-value))))))
 
-    
-  
+(defun get-lexeme (iterator machine)
+  (if (eof-p iterator)
+      (eof-token)
+      (get-token iterator machine)))

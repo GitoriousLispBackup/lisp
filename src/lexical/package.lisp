@@ -48,4 +48,5 @@
 	   transitions
 	   machine-value
 	   get-token
+	   get-lexeme
 	   print-stream))
