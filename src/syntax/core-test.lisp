@@ -122,8 +122,76 @@
     (!equal (production-first '(z) grammar) '(d e))))
 
 (defgrammar my-grammar
-  ((x a)
-   (x (y b))
-   (y c)
-   (y (x d)))
+    ((x :eps)
+     (x a)
+     (x (y b))
+     (y c)
+     (y (x d)))
   :start x)
+
+(deftest core-test point-making ()
+  (!equal (burning-syntax::make-point '(x a b c))
+	  '((x a b c) (a b c) ()))
+  (!equal (burning-syntax::make-points 'x my-grammar)
+	  '(((x) () ()) ((x a) (a) ()) ((x y b) (y b) ()))))
+
+(deftest core-test point-closure-test ()
+  (!equal (burning-syntax::point-closure (burning-syntax::make-point '(s x)) my-grammar)
+	  '(x y)))
+
+(deftest core-test point-joining ()
+  (!equal (burning-syntax::join-points (list (list '(x a b c) '(c) ())
+					     (list '(x a b) '(b) ())
+					     (list '(x a b) '(b) ())
+					     (list '(x a b) '(a b) ())
+					     (list '(x a b c) '(b c) ())))
+	  '(((x a b) (a b) ())
+	    ((x a b) (b) ())
+	    ((x a b c) (b c) ())
+	    ((x a b c) (c) ()))))
+
+(deftest core-test point-goto ()
+  (let ((point (burning-syntax::make-point '(s x))))
+    (!equal (burning-syntax::point-goto point 'x)
+	    '(((s x) () ())))))
+
+(deftest core-test points-closure ()
+  (let ((point1 (burning-syntax::make-point '(x)))
+	(point2 (burning-syntax::make-point '(x y b))))
+    (!equal (burning-syntax::points-closure `(,point1 ,point2) my-grammar)
+	    '((((x) () ())
+	       ((x y b) (y b) ()))
+	      (x y)))))
+
+(deftest core-test points-goto ()
+  (let ((points '((((x) () ())
+		   ((x y b) (y b) ()))
+		  (x y))))
+    (!equal (burning-syntax::points-goto points 'x my-grammar)
+	    '((((y x d) (d) ()))
+	      ()))
+    (!equal (burning-syntax::points-goto points 'y my-grammar)
+	    '((((x y b) (b) ()))
+	      ()))
+    (!equal (burning-syntax::points-goto points 'a my-grammar)
+	    '((((x a) () ()))
+	      ()))
+    (!equal (burning-syntax::points-goto points 'c my-grammar)
+	    '((((y c) () ()))
+	      ()))))
+
+(deflexeme id (:empty))
+(deflexeme + (:empty))
+(deflexeme * (:empty))
+(deflexeme ob (:empty))
+(deflexeme cb (:empty))
+
+(defgrammar expression-grammar
+    ((x ((:|| (x + t) t)))
+     (t ((:|| (t * f) f)))
+     (f ((:|| ( ob x cb ) id))))
+  :start x)
+
+
+    
+	  

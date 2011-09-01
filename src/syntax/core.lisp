@@ -91,5 +91,75 @@
      (make-grammar (list ,@(mapcar #'(lambda (x) (defined-production x)) productions))
 		   :start-symbol ',start)))
 
-    
-  
+(defun make-point (production)
+  (list production (rest production) ()))
+
+(defun make-points (symbol grammar)
+  (mapcar #'make-point (symbol-productions symbol grammar)))
+
+(defun point-production (point)
+  (first point))
+
+(defun point-position (point)
+  (second point))
+
+(defun point-lookups (point)
+  (third point))
+
+(defun symbol< (symbol1 symbol2)
+  (string< (symbol-name symbol1) (symbol-name symbol2)))
+
+(defun production< (production1 production2)
+  (cond
+    ((null production1) t)
+    ((null production2) nil)
+    ((symbol< (first production1) (first production2)) t)
+    ((symbol< (first production2) (first production1)) nil)
+    (t (production< (rest production1) (rest production2)))))
+
+(defun point< (point1 point2)
+  (cond
+    ((production< (point-production point1) (point-production point2)) t)
+    ((production< (point-production point2) (point-production point1)) nil)
+    (t (> (length (point-position point1)) (length (point-position point2))))))
+
+(defun symbol-closure (symbol grammar symbols-list)
+  (cond
+    ((terminal-p symbol grammar) symbols-list)
+    ((find symbol symbols-list) symbols-list)
+    (t (sort (adjoin symbol 
+		     (multi-union (mapcar #'(lambda (x) (point-closure x grammar (cons symbol symbols-list))) 
+					  (make-points symbol grammar))))
+		   #'symbol<))))
+
+(defun point-closure (point grammar &optional (symbols ()))
+  (if (null (point-position point))
+      ()
+      (symbol-closure (first (point-position point)) grammar symbols)))
+
+(defun join-points (points)
+  (sort (remove-duplicates points :test #'equal) #'point<))
+
+(defun point-goto (point symbol)
+  (if (eq (first (point-position point)) symbol)
+      `(,(list (point-production point) (rest (point-position point)) ()))
+      ()))
+
+(defun points-closure (points grammar)
+  (list (join-points (first points))
+	(multi-union (append (mapcar #'(lambda (x) (point-closure x grammar)) (first points))
+			     (list (second points))))))
+
+(defun points-set (points grammar)
+  (append (first points)
+	  (apply #'append (mapcar #'(lambda (x) (make-points x grammar)) (second points)))))
+
+(defun points-goto (points symbol grammar)
+  (list (join-points (apply #'append 
+			    (mapcar #'(lambda (x) (point-goto x symbol)) 
+				    (points-set points grammar))))
+	()))
+      
+
+
+	       
