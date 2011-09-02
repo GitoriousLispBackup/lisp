@@ -159,6 +159,74 @@
 			    (mapcar #'(lambda (x) (point-goto x symbol)) 
 				    (points-set points grammar))))
 	()))
+
+(defun starting-points (grammar)
+  (let ((point (make-point `(:start ,(grammar-start grammar)))))
+    (list (list point) (point-closure point grammar))))
+
+(defun null-points-p (points)
+  (and (null (first points))
+       (null (second points))))
+
+(defgeneric add-state (point table))
+(defgeneric state-goto (state symbol table))
+(defgeneric (setf state-goto) (value state symbol table))
+(defgeneric state-point (state table))
+
+(defclass points-table ()
+  (states points))
+
+(defmethod initialize-instance :after ((table points-table) &key)
+  (setf (slot-value table 'states) (make-array 0 :adjustable t :fill-pointer 0))
+  (setf (slot-value table 'points) (make-array 0 :adjustable t :fill-pointer 0)))
+
+(defmethod add-state (point (table points-table))
+  (let ((new-state (vector-push-extend () (slot-value table 'states)))
+	(new-point (vector-push-extend point (slot-value table 'points))))
+    (assert (= new-state new-point))
+    new-state))
+
+(defun points-table-entity (state symbol table)
+  (assoc symbol (aref (slot-value table 'states) state)))
+
+(defmethod state-goto (state symbol (table points-table))
+  (rest (points-table-entity state symbol table)))
+
+(defmethod (setf state-goto) (value state symbol table)
+  (let ((place (points-table-entity state symbol table)))
+    (if place
+	(setf (rest place) value)
+	(push (cons symbol value)
+	      (aref (slot-value table 'states) state)))))
+
+(defmethod state-point (state (table points-table))
+  (aref (slot-value table 'points) state))
+
+(defun add-next-state (state symbol table added-points grammar)
+  (let ((next-point (points-closure (points-goto (state-point state table) symbol grammar) grammar)))
+    (unless (null-points-p next-point)
+      (add-state-to-table next-point table added-points grammar)
+      (let ((next-state (gethash next-point added-points)))
+	(setf (state-goto state symbol table) next-state)))))
+
+(defun add-new-state-to-table (point table added-points grammar)
+  (let ((new-state (add-state point table)))
+    (setf (gethash point added-points) new-state)
+    (mapc #'(lambda (x) (add-next-state new-state x table added-points grammar))
+	  (append (grammar-terminals grammar)
+		  (grammar-non-terminals grammar)))))
+
+(defun add-state-to-table (point table added-points grammar)
+  (cond
+    ((gethash point added-points) t)
+    (t (add-new-state-to-table point table added-points grammar))))
+
+(defun make-points-table (grammar)
+  (let ((first-point (starting-points grammar))
+	(added-points (make-hash-table :test 'equal))
+	(table (make-instance 'points-table)))
+    (add-state-to-table first-point table added-points grammar)
+    table))
       
 
 

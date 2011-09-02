@@ -158,7 +158,7 @@
 (deftest core-test points-closure ()
   (let ((point1 (burning-syntax::make-point '(x)))
 	(point2 (burning-syntax::make-point '(x y b))))
-    (!equal (burning-syntax::points-closure `(,point1 ,point2) my-grammar)
+    (!equal (burning-syntax::points-closure `((,point1 ,point2) ()) my-grammar)
 	    '((((x) () ())
 	       ((x y b) (y b) ()))
 	      (x y)))))
