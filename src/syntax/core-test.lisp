@@ -56,7 +56,7 @@
 	(rule2 (make-rule 'rule2 '(:* rule1 lexeme1) 'lexeme3 '(:|| lexeme1 lexeme2))))
     (let ((grammar (make-grammar `(,rule1))))
       (!productions= (grammar-productions grammar) '((rule1 lexeme1 lexeme2 rule1 lexeme1)))
-      (!equal (grammar-terminals grammar) '(:eps lexeme2 lexeme1))
+      (!equal (grammar-terminals grammar) '(:eps :no-symbol lexeme2 lexeme1))
       (!equal (grammar-non-terminals grammar) '(rule1)))
     (let ((grammar (make-grammar `(,rule1 ,rule2))))
       (!productions= (grammar-productions grammar)
@@ -65,7 +65,7 @@
 		       (rule2 :gensym lexeme3 lexeme2)
 		       (:gensym)
 		       (:gensym rule1 lexeme1 :gensym)))
-      (!equal (grammar-terminals grammar) '(:eps lexeme3 lexeme2 lexeme1))
+      (!equal (grammar-terminals grammar) '(:eps :no-symbol lexeme3 lexeme2 lexeme1))
       (!production= (grammar-non-terminals grammar) '(rule2 rule1 :gensym)))))
 
 (deflexeme a (:empty))
@@ -185,6 +185,7 @@
 (deflexeme * (:empty))
 (deflexeme ob (:empty))
 (deflexeme cb (:empty))
+(deflexeme = (:empty))
 
 (defgrammar expression-grammar
     ((x ((:|| (x + t) t)))
@@ -192,6 +193,22 @@
      (f ((:|| ( ob x cb ) id))))
   :start x)
 
+(defgrammar pointer-grammar
+    ((s ((:|| (l = r) r)))
+     (l ((:|| (* r) id)))
+     (r l))
+  :start s)
 
+(deftest core-test lr1-point-closure ()
+  (let ((point '((x x + t) (x + t) ())))
+    (!equal (burning-syntax::lr1-point-closure point ':no-symbol expression-grammar)
+	    '((f (+ *)) (t (+ *)) (x (+)))))
+  (let ((point '((s l) (l) ())))
+    (!equal (burning-syntax::lr1-point-closure point ':no-symbol pointer-grammar)
+	    '((l (:no-symbol)))))
+  (let ((point '((z x) (x x) ())))
+    (!equal (burning-syntax::lr1-point-closure point ':no-symbol my-grammar)
+	    '((x (a c d :no-symbol)) (y (a c d :no-symbol))))))
     
-	  
+
+

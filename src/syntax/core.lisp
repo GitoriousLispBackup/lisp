@@ -47,7 +47,7 @@
     (make-instance 'grammar
 		   :productions productions
 		   :start-symbol start-symbol
-		   :terminals (cons :eps terminals)
+		   :terminals (append (list :eps :no-symbol) terminals)
 		   :non-terminals non-terminals)))
 
 (defun nullable-p (symbol grammar &optional (deny-list ()))
@@ -111,6 +111,7 @@
 
 (defun production< (production1 production2)
   (cond
+    ((and (null production1) (null production2)) nil)
     ((null production1) t)
     ((null production2) nil)
     ((symbol< (first production1) (first production2)) t)
@@ -123,19 +124,28 @@
     ((production< (point-production point2) (point-production point1)) nil)
     (t (> (length (point-position point1)) (length (point-position point2))))))
 
-(defun symbol-closure (symbol grammar symbols-list)
+(defun symbol-closure (symbol grammar lookaheads symbols-list)
   (cond
     ((terminal-p symbol grammar) symbols-list)
     ((find symbol symbols-list) symbols-list)
+    ((and lookaheads (subsetp lookaheads (assoc symbol symbols-list))) symbols-list)
     (t (sort (adjoin symbol 
-		     (multi-union (mapcar #'(lambda (x) (point-closure x grammar (cons symbol symbols-list))) 
+		     (multi-union (mapcar #'(lambda (x) (point-closure x grammar lookaheads
+								       (cons symbol symbols-list))) 
 					  (make-points symbol grammar))))
 		   #'symbol<))))
 
-(defun point-closure (point grammar &optional (symbols ()))
+(defun point-closure (point grammar &optional (lookaheads ()) (symbols ()))
   (if (null (point-position point))
       ()
-      (symbol-closure (first (point-position point)) grammar symbols)))
+      (symbol-closure (first (point-position point)) grammar lookaheads symbols)))
+
+(defun lr1-point-closure (point symbol grammar)
+  (cond
+    ((null (point-position point)) ())
+    (t (mapcar #'(lambda (x) 
+		   (list x (production-first (append (rest (point-position point)) (list symbol)) grammar)))
+	       (symbol-closure (first (point-position point)) grammar () ())))))
 
 (defun join-points (points)
   (sort (remove-duplicates points :test #'equal) #'point<))
@@ -144,6 +154,9 @@
   (if (eq (first (point-position point)) symbol)
       `(,(list (point-production point) (rest (point-position point)) ()))
       ()))
+
+(defun point-next (point)
+  (point-goto point (first (point-position point))))
 
 (defun points-closure (points grammar)
   (list (join-points (first points))
@@ -174,7 +187,8 @@
 (defgeneric state-point (state table))
 
 (defclass points-table ()
-  (states points))
+  (states 
+   (points :reader points)))
 
 (defmethod initialize-instance :after ((table points-table) &key)
   (setf (slot-value table 'states) (make-array 0 :adjustable t :fill-pointer 0))
@@ -216,6 +230,58 @@
 	  (append (grammar-terminals grammar)
 		  (grammar-non-terminals grammar)))))
 
+;;
+;; LARL symbols
+;;
+
+(defun next-state (state point table)
+  (state-goto state (first (point-position point)) table))
+
+(defun set-generated (symbol point state table gen-table)
+  (let ((next-point (point-next point))
+	(next-state (next-state state point table)))
+    (assert (not (null next-state)))
+    (let ((value (assoc next-point (aref gen-table next-state))))
+      (if value
+	  (pushnew symbol (rest value))
+	  (push (cons next-point symbol)
+		(aref gen-table next-state))))))
+
+(defun set-spreaded (point state table spreaded)
+  (let ((next-point (point-next point))
+	(next-state (next-state state point table)))
+    (let ((value (assoc point (aref spreaded state))))
+      (if value
+	  (pushnew (cons next-state next-point) value)
+	  (push (cons point (cons next-state next-point))
+		(aref spreaded state))))))
+
+(defun fill-larl (production point state table generated spreaded grammar)
+  (if (or (null production)
+	  (terminal-p (first production) grammar))
+      t
+      (let ((symbols (production-first (append (rest production) '(:no-symbol)) grammar)))
+	(mapc #'(lambda (x) (if (eq x ':no-symbol)
+				(set-spreaded point state table spreaded)
+				(set-generated x point state table generated))) 
+	      symbols))))
+
+(defun fill-point-larl (point state table generated spreaded grammar)
+  (fill-larl (point-position point) point state table generated spreaded grammar)
+  (let ((closure (point-closure point grammar)))
+    (dolist (symbol closure)
+      (mapcar #'(lambda (x) (fill-larl (point-position x) point state table generated spreaded grammar))
+	      (make-points symbol grammar)))))
+
+(defun fill-larl-symbols (generated-symbols spreaded-symbols table grammar)
+  (dotimes (i (length (points table)))
+    (mapc #'(lambda (point) (fill-point-larl point i table generated-symbols spreaded-symbols grammar))
+		    (first (state-point i table)))))
+
+;;
+;; LARL table generation
+;;
+
 (defun add-state-to-table (point table added-points grammar)
   (cond
     ((gethash point added-points) t)
@@ -226,7 +292,15 @@
 	(added-points (make-hash-table :test 'equal))
 	(table (make-instance 'points-table)))
     (add-state-to-table first-point table added-points grammar)
+    (let ((generated-symbols (make-array (length (points table)) :initial-element nil))
+	  (spreaded-symbols (make-array (length (points table)) :initial-element nil)))
+      (fill-larl-symbols generated-symbols spreaded-symbols table grammar)
+      (print generated-symbols)
+      (print spreaded-symbols))
     table))
+
+
+  
       
 
 
