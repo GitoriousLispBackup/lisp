@@ -201,14 +201,14 @@
 
 (deftest core-test lr1-point-closure ()
   (let ((point '((x x + t) (x + t) ())))
-    (!equal (burning-syntax::lr1-point-closure point ':no-symbol expression-grammar)
-	    '((f (+ *)) (t (+ *)) (x (+)))))
+    (!equal (burning-syntax::lr1-point-closure point '(:no-symbol) expression-grammar)
+	    '((f (* +)) (t (* +)) (x (+)))))
   (let ((point '((s l) (l) ())))
-    (!equal (burning-syntax::lr1-point-closure point ':no-symbol pointer-grammar)
+    (!equal (burning-syntax::lr1-point-closure point '(:no-symbol) pointer-grammar)
 	    '((l (:no-symbol)))))
   (let ((point '((z x) (x x) ())))
-    (!equal (burning-syntax::lr1-point-closure point ':no-symbol my-grammar)
-	    '((x (a c d :no-symbol)) (y (a c d :no-symbol))))))
+    (!equal (burning-syntax::lr1-point-closure point '(:no-symbol) my-grammar)
+	    '((x (a c d :no-symbol)) (y (b))))))
     
 
 

@@ -124,28 +124,63 @@
     ((production< (point-production point2) (point-production point1)) nil)
     (t (> (length (point-position point1)) (length (point-position point2))))))
 
-(defun symbol-closure (symbol grammar lookaheads symbols-list)
+(defun symbol-closure (symbol grammar symbols-list)
   (cond
     ((terminal-p symbol grammar) symbols-list)
     ((find symbol symbols-list) symbols-list)
-    ((and lookaheads (subsetp lookaheads (assoc symbol symbols-list))) symbols-list)
     (t (sort (adjoin symbol 
-		     (multi-union (mapcar #'(lambda (x) (point-closure x grammar lookaheads
+		     (multi-union (mapcar #'(lambda (x) (point-closure x grammar 
 								       (cons symbol symbols-list))) 
 					  (make-points symbol grammar))))
 		   #'symbol<))))
 
-(defun point-closure (point grammar &optional (lookaheads ()) (symbols ()))
+(defun point-closure (point grammar &optional (symbols ()))
   (if (null (point-position point))
       ()
-      (symbol-closure (first (point-position point)) grammar lookaheads symbols)))
+      (symbol-closure (first (point-position point)) grammar symbols)))
 
-(defun lr1-point-closure (point symbol grammar)
+(defun cons-symbol-list (symbol list)
+  (join-symbol-lists (list symbol) list))
+
+(defun join-symbol-lists (list1 list2)
   (cond
-    ((null (point-position point)) ())
-    (t (mapcar #'(lambda (x) 
-		   (list x (production-first (append (rest (point-position point)) (list symbol)) grammar)))
-	       (symbol-closure (first (point-position point)) grammar () ())))))
+    ((null list1) list2)
+    ((null list2) list1)
+    ((symbol< (first (first list1)) (first (first list2))) (cons (first list1) 
+								 (join-symbol-lists (rest list1) list2)))
+    ((symbol< (first (first list2)) (first (first list1))) (join-symbol-lists list2 list1))
+    (t (cons (cons (first (first list1))
+		   (list (sort (union (first (rest (first list1))) (first (rest (first list2)))) #'symbol<)))
+	     (join-symbol-lists (rest list1) (rest list2))))))
+    
+(defun append-symbols (symbol-lists)
+  (cond
+    ((null symbol-lists) nil)
+    ((null (rest symbol-lists)) (first symbol-lists))
+    (t (join-symbol-lists (first symbol-lists) (append-symbols (rest symbol-lists))))))
+
+(defun lr1-symbol-closure (symbol grammar lookups symbols)
+  (cond
+    ((terminal-p symbol grammar) symbols)
+    ((subsetp lookups (first (rest (find symbol symbols :key #'first)))) symbols)
+    (t (sort (append-symbols 
+	      (mapcar #'(lambda (x) (lr1-point-closure x lookups grammar
+						       (cons-symbol-list (cons symbol (list lookups))
+									       symbols)))
+		      (make-points symbol grammar)))
+	     #'symbol< :key #'first))))
+
+(defun lr1-point-closure (point lookups grammar &optional (symbols ()))
+  (cond
+    ((null (point-position point)) symbols)
+    (t (let ((symbol (first (point-position point)))
+	     (rest (rest (point-position point))))
+	 (sort (append-symbols (mapcar #'(lambda (x) 
+					   (lr1-symbol-closure symbol grammar 
+							       (production-first (append rest (list x)) grammar)
+							       symbols))
+				       lookups))
+	       #'symbol< :key #'first)))))
 
 (defun join-points (points)
   (sort (remove-duplicates points :test #'equal) #'point<))
@@ -237,9 +272,9 @@
 (defun next-state (state point table)
   (state-goto state (first (point-position point)) table))
 
-(defun set-generated (symbol point state table gen-table)
-  (let ((next-point (point-next point))
-	(next-state (next-state state point table)))
+(defun set-generated (symbol point real-point state table gen-table)
+  (let ((next-point (point-next real-point))
+	(next-state (next-state state real-point table)))
     (assert (not (null next-state)))
     (let ((value (assoc next-point (aref gen-table next-state))))
       (if value
@@ -247,36 +282,67 @@
 	  (push (cons next-point symbol)
 		(aref gen-table next-state))))))
 
-(defun set-spreaded (point state table spreaded)
-  (let ((next-point (point-next point))
-	(next-state (next-state state point table)))
+(defun set-spreaded (point real-point state table spreaded)
+  (let ((next-point (point-next real-point))
+	(next-state (next-state state real-point table)))
+    (assert (not (null next-state)))
     (let ((value (assoc point (aref spreaded state))))
-      (if value
-	  (pushnew (cons next-state next-point) value)
-	  (push (cons point (cons next-state next-point))
-		(aref spreaded state))))))
+      (push (cons point (cons next-state next-point))
+	    (aref spreaded state)))))
 
-(defun fill-larl (production point state table generated spreaded grammar)
-  (if (or (null production)
-	  (terminal-p (first production) grammar))
-      t
-      (let ((symbols (production-first (append (rest production) '(:no-symbol)) grammar)))
-	(mapc #'(lambda (x) (if (eq x ':no-symbol)
-				(set-spreaded point state table spreaded)
-				(set-generated x point state table generated))) 
-	      symbols))))
+(defun fill-larl (point base-point lookaheads state table generated spreaded grammar)
+  (mapc #'(lambda (x) (if (eq x ':no-symbol)
+			  (set-spreaded base-point point state table spreaded)
+			  (set-generated x base-point point state table generated))) 
+	lookaheads))
 
 (defun fill-point-larl (point state table generated spreaded grammar)
-  (fill-larl (point-position point) point state table generated spreaded grammar)
-  (let ((closure (point-closure point grammar)))
+  (unless (null (point-position point))
+    (fill-larl point point '(:no-symbol) state table generated spreaded grammar))
+  (let ((closure (lr1-point-closure point '(:no-symbol) grammar)))
     (dolist (symbol closure)
-      (mapcar #'(lambda (x) (fill-larl (point-position x) point state table generated spreaded grammar))
-	      (make-points symbol grammar)))))
+      (mapcar #'(lambda (x) (fill-larl x point (second symbol) state table generated spreaded grammar))
+	      (make-points (first symbol) grammar)))))
 
 (defun fill-larl-symbols (generated-symbols spreaded-symbols table grammar)
   (dotimes (i (length (points table)))
     (mapc #'(lambda (point) (fill-point-larl point i table generated-symbols spreaded-symbols grammar))
 		    (first (state-point i table)))))
+
+(defun find-point (point state table)
+  (flet ((point-equal (point1 point2)
+	   (and (equal (point-production point1) (point-production point2))
+		(equal (point-position point1) (point-position point2)))))
+    (let ((value (find point (first (state-point state table)) :test #'point-equal)))
+      (assert value)
+      value)))
+
+(defun generate-larl-symbols (table generated-symbols)
+  (push ':eps
+	(third (find ':start (first (state-point 0 table)) :key #'(lambda (x) (first (first x))))))
+  (flet ((generate-larl (point symbol state table)
+	   (pushnew symbol (third (find-point point state table)))))
+    (dotimes (i (length (points table)))
+      (mapc #'(lambda (x) (generate-larl (first (first x)) (rest x) i table)) (aref generated-symbols i)))))
+
+(defun spread-larl-symbols (table spreaded)
+  (labels 
+      ((spread-larl (point dest-point state spreaded-state)
+	 (let ((spreading-point (find-point point state table))
+	       (spreaded-point (find-point dest-point spreaded-state table)))
+	   (if (subsetp (third spreading-point) (third spreaded-point))
+	       nil
+	       (progn
+		 (setf (third spreaded-point) 
+		       (sort (union (third spreading-point) (third spreaded-point)) #'symbol<))
+		 t)))))
+  (let ((continue? nil))
+    (dotimes (i (length (points table)))
+      (when (eval (cons 'or 
+			(mapcar #'(lambda (x) (spread-larl (first x) (third x) i (second x))) (aref spreaded i))))
+	(setq continue? t)))
+    (when continue? 
+      (spread-larl-symbols table spreaded)))))
 
 ;;
 ;; LARL table generation
@@ -295,8 +361,8 @@
     (let ((generated-symbols (make-array (length (points table)) :initial-element nil))
 	  (spreaded-symbols (make-array (length (points table)) :initial-element nil)))
       (fill-larl-symbols generated-symbols spreaded-symbols table grammar)
-      (print generated-symbols)
-      (print spreaded-symbols))
+      (generate-larl-symbols table generated-symbols)
+      (spread-larl-symbols table spreaded-symbols))
     table))
 
 
