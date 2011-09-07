@@ -14,9 +14,7 @@
 	   defgrammar
 	   
 	   make-lr-table
-	   add-table-state
-	   table-action
-	   table-goto
-	   transition-action
-	   merge-action
-	   accept-action))
+	   lr-parser
+	   make-lr-parser
+	   parser-next
+	   parser-value))

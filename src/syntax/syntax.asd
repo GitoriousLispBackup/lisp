@@ -7,6 +7,6 @@
   :licence "GPL v3"
   :depends-on (:burning-lexical)
   :components ((:file "package")
-	       (:file "lr-parser" :depends-on ("package"))
 	       (:file "core" :depends-on ("package"))
+	       (:file "lr-parser" :depends-on ("package" "core"))
 	       (:file "language" :depends-on ("package" "core"))))

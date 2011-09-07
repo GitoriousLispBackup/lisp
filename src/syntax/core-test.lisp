@@ -68,11 +68,11 @@
       (!equal (grammar-terminals grammar) '(:eps :no-symbol lexeme3 lexeme2 lexeme1))
       (!production= (grammar-non-terminals grammar) '(rule2 rule1 :gensym)))))
 
-(deflexeme a (:empty))
-(deflexeme b (:empty))
-(deflexeme c (:empty))
-(deflexeme d (:empty))
-(deflexeme e (:empty))
+(deflexeme a (:char #\a))
+(deflexeme b (:char #\b))
+(deflexeme c (:char #\c))
+(deflexeme d (:char #\d))
+(deflexeme e (:char #\e))
 
 (deftest core-test nullable-test ()
   (let ((grammar (make-grammar `(,(make-rule 'rule1 'lexeme1)
@@ -210,5 +210,4 @@
     (!equal (burning-syntax::lr1-point-closure point '(:no-symbol) my-grammar)
 	    '((x (a c d :no-symbol)) (y (b))))))
     
-
 
