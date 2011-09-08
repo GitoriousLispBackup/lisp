@@ -17,4 +17,5 @@
 	   lr-parser
 	   make-lr-parser
 	   parser-next
-	   parser-value))
+	   parser-value
+	   parse-input))

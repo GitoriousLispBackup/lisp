@@ -199,6 +199,16 @@
      (r l))
   :start s)
 
+(defgrammar axml-grammar
+    ((xml (open-tag xml-nodes closing-tag))
+     (xml short-tag)
+     (open-tag a)
+     (closing-tag b)
+     (short-tag c)
+     (xml-nodes :eps)
+     (xml-nodes (xml xml-nodes)))
+  :start xml)
+
 (deftest core-test lr1-point-closure ()
   (let ((point '((x x + t) (x + t) ())))
     (!equal (burning-syntax::lr1-point-closure point '(:no-symbol) expression-grammar)
@@ -208,6 +218,11 @@
 	    '((l (:no-symbol)))))
   (let ((point '((z x) (x x) ())))
     (!equal (burning-syntax::lr1-point-closure point '(:no-symbol) my-grammar)
-	    '((x (a c d :no-symbol)) (y (b))))))
-    
+	    '((x (a c d :no-symbol)) (y (b)))))
+  (let ((point '((xml-nodes xml xml-nodes) (xml-nodes) ())))
+    (!equal (burning-syntax::lr1-point-closure point '(:no-symbol) axml-grammar)
+	    '((open-tag (a b c))
+	      (short-tag (a c :no-symbol))
+	      (xml (a c :no-symbol))
+	      (xml-nodes (:no-symbol))))))
 

@@ -156,18 +156,19 @@
 (defun append-symbols (symbol-lists)
   (cond
     ((null symbol-lists) nil)
-    ((null (rest symbol-lists)) (first symbol-lists))
-    (t (join-symbol-lists (first symbol-lists) (append-symbols (rest symbol-lists))))))
+    ((null (rest symbol-lists)) (copy-tree (first symbol-lists)))
+    (t (join-symbol-lists (copy-tree (first symbol-lists)) (append-symbols (rest symbol-lists))))))
 
 (defun lr1-symbol-closure (symbol grammar lookups symbols)
   (cond
     ((terminal-p symbol grammar) symbols)
     ((subsetp lookups (first (rest (find symbol symbols :key #'first)))) symbols)
-    (t (sort (append-symbols 
-	      (mapcar #'(lambda (x) (lr1-point-closure x lookups grammar
-						       (cons-symbol-list (cons symbol (list lookups))
-									       symbols)))
-		      (make-points symbol grammar)))
+    (t (sort (copy-tree 
+	      (append-symbols 
+	       (mapcar #'(lambda (x) (lr1-point-closure x lookups grammar
+							(cons-symbol-list (cons symbol (list lookups))
+									  symbols)))
+		       (make-points symbol grammar))))
 	     #'symbol< :key #'first))))
 
 (defun lr1-point-closure (point lookups grammar &optional (symbols ()))
@@ -175,11 +176,12 @@
     ((null (point-position point)) symbols)
     (t (let ((symbol (first (point-position point)))
 	     (rest (rest (point-position point))))
-	 (sort (append-symbols (mapcar #'(lambda (x) 
-					   (lr1-symbol-closure symbol grammar 
-							       (production-first (append rest (list x)) grammar)
-							       symbols))
-				       lookups))
+	 (sort (copy-tree (append-symbols 
+			   (mapcar #'(lambda (x) 
+				       (lr1-symbol-closure symbol grammar 
+							   (production-first (append rest (list x)) grammar)
+							   symbols))
+				       lookups)))
 	       #'symbol< :key #'first)))))
 
 (defun join-points (points)
@@ -231,7 +233,7 @@
 
 (defmethod add-state (point (table points-table))
   (let ((new-state (vector-push-extend () (slot-value table 'states)))
-	(new-point (vector-push-extend point (slot-value table 'points))))
+	(new-point (vector-push-extend (copy-tree point) (slot-value table 'points))))
     (assert (= new-state new-point))
     new-state))
 
@@ -292,6 +294,7 @@
 
 (defun fill-larl (point base-point lookaheads state table generated spreaded grammar)
   (unless (null (point-position point))
+
     (mapc #'(lambda (x) (if (eq x ':no-symbol)
 			    (set-spreaded base-point point state table spreaded)
 			    (set-generated x base-point point state table generated))) 
@@ -301,8 +304,8 @@
   (fill-larl point point '(:no-symbol) state table generated spreaded grammar)
   (let ((closure (lr1-point-closure point '(:no-symbol) grammar)))
     (dolist (symbol closure)
-      (mapcar #'(lambda (x) (fill-larl x point (second symbol) state table generated spreaded grammar))
-	      (make-points (first symbol) grammar)))))
+    (mapcar #'(lambda (x) (fill-larl x point (second symbol) state table generated spreaded grammar))
+	    (make-points (first symbol) grammar)))))
 
 (defun fill-larl-symbols (generated-symbols spreaded-symbols table grammar)
   (dotimes (i (length (points table)))
@@ -334,7 +337,8 @@
 	       nil
 	       (progn
 		 (setf (third spreaded-point) 
-		       (sort (union (third spreading-point) (third spreaded-point)) #'symbol<))
+		       (sort (union (copy-tree (third spreading-point)) 
+				    (copy-tree (third spreaded-point))) #'symbol<))
 		 t)))))
   (let ((continue? nil))
     (dotimes (i (length (points table)))
