@@ -1,1 +1,0 @@
-/home/sopindm/lisp/src/lexical/lexical.asd
