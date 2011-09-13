@@ -56,12 +56,6 @@
      (xml-nodes (xml xml-nodes)))
   :start xml)
 
-(defun test-xml ()
-  (let ((xml-machine (create-state-machine xml-lexic))
-	(output-file (open "/home/sopindm/models/lamborghini.rtxml.parsed" :direction :output :if-exists :overwrite
-			   :if-does-not-exist :create))
-	(parser (make-lr-parser (make-lr-table xml-grammar))))
-    (with-open-file (stream "/home/sopindm/models/lamborghini.rtxml")
-      (with-input-iterator (iterator stream)
-	(write (parse-input iterator xml-machine parser) :stream output-file)
-	(close output-file)))))
+(defparameter xml-machine (create-state-machine xml-lexic))
+(defparameter xml-parser (make-lr-parser (make-lr-table xml-grammar)))
+

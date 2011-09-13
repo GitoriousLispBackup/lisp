@@ -6,5 +6,6 @@
   :author "Dmitry Sopin <sopindm@gmail.com>"
   :licence "GPL v3"
   :components ((:file "package")
-	       (:file "lexic" :depends-on ("package")))
-  :depends-on (:burning-lexical :burning-syntax))
+	       (:file "lexic" :depends-on ("package"))
+	       (:file "core" :depends-on ("package" "lexic")))
+  :depends-on (:burning-lexical :burning-syntax :parse-number))

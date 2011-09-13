@@ -79,11 +79,13 @@
   (first (slot-value parser 'state-stack)))
 
 (defun push-production-to-parser (production parser)
+  (declare (optimize (speed 3) (safety 0)))
   (let ((next-state (table-goto (current-state parser) (first production) (parser-table parser))))
     (assert next-state)
     (push-state-to-parser next-state (rest production) parser)))
 
 (defun pop-production (production parser)
+  (declare (optimize (speed 3) (safety 0)))
   (labels 
       ((pop-token (name parser)
 	 (pop (slot-value parser 'state-stack))
