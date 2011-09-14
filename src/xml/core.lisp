@@ -12,7 +12,7 @@
 		 :childs childs))
 
 (defun xml-attribute (node name)
-  (let ((attribute (find name (xml-attributes node) :key #'first)))
+  (let ((attribute (find name (xml-attributes node) :key #'first :test #'equal)))
     (if attribute
 	(values (rest attribute) t)
 	(values nil nil))))
@@ -93,11 +93,11 @@
 (defun parse-xml (stream)
   (let ((iterator (make-iterator stream)))
     (decode-xml (parse-input iterator xml-machine xml-parser))))
-  
+
 (defun test-xml ()
   (let ((output-file (open "/home/sopindm/models/f010.rtm.parsed" :direction :output :if-exists :overwrite
 			   :if-does-not-exist :create)))
     (with-open-file (stream "/home/sopindm/models/f010.rtm")
-      (parse-xml stream) output-file)
+      (xml-print (parse-xml stream) output-file))
     (close output-file)))
 

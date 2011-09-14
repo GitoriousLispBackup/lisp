@@ -9,7 +9,10 @@
     (!equal (multiple-value-list (xml-attribute node 'b)) '(1 t))
     (!t (xml-attribute-p node 'b))
     (!equal (multiple-value-list (xml-attribute node 'c)) '(nil nil))
-    (!null (xml-attribute-p node 'c))))
+    (!null (xml-attribute-p node 'c)))
+  (let ((node (make-instance 'xml-node :attributes '(("a" . 0)("b" . 1)))))
+    (!equal (xml-attribute node "a") 0)
+    (!equal (xml-attribute node "b") 1)))
 
 (deftest core-test set-attribute-test ()
   (let ((node (make-instance 'xml-node :attributes '((a . 0)))))
