@@ -35,11 +35,19 @@
 (defun iteration-time (iteration)
   (value-value (find "time" (iteration-values iteration) :test #'equal :key #'value-name)))
 
+(defun iteration-time-measure (iteration)
+  (value-measure (find "time" (iteration-values iteration) :test #'equal :key #'value-name)))
+
 (defun phase-time (phase)
   (apply #'+ (mapcar #'iteration-time (phase-iterations phase))))
 
+(defun phase-time-measure (phase)
+  (iteration-time-measure (first (phase-iterations phase))))
+
 (defun parse-phase (node)
-  (make-phase :name "" :iterations `(,(parse-iteration node))))
+  (let ((iteration (parse-iteration node)))
+    (setf (slot-value iteration 'name) nil)
+    (make-phase :name (xml-attribute node "name") :iterations `(,iteration))))
 
 (defun parse-loop (node)
   (make-phase :name (xml-attribute node "name") 
@@ -80,12 +88,16 @@
 		      (phase-iterations phase)))))
 
 (defun iteration-header (iteration)
+  (labels ((full-value-name (name measure)
+	     (if measure
+		 (format nil "~a (~a)" name measure)
+		 (format nil "~a" name))))
   (concatenate 'array
-	       (map 'array #'value-name (iteration-values iteration))
-	       (map 'array  #'(lambda (x) (concatenate 'string 
-						      (phase-name x)
-						      "-time"))
-		    (iteration-subphases iteration))))
+	       (map 'array #'(lambda (x) (full-value-name (value-name x) (value-measure x)))
+		    (iteration-values iteration))
+	       (map 'array  #'(lambda (x) (full-value-name (concatenate 'string (phase-name x) "-time") 
+							   (phase-time-measure x)))
+		    (iteration-subphases iteration)))))
 
 (defun iteration-line (iteration)
   (concatenate 'array
@@ -93,34 +105,20 @@
 	       (map 'array #'phase-time (iteration-subphases iteration))))
 
 (defclass report-table ()
-  ((name :initarg :name :reader table-name)
+  ((path :initarg :path :reader table-path)
    (header :initarg :header :reader table-header)
    (lines :initarg :lines :reader table-lines)))
 
-(defun concatenate-path (prefix name)
-  (cond 
-    ((or (equal name "") (not name)) prefix)
-    ((equal prefix "") name)
-    (t (format nil "~a/~a" prefix name))))
+(defun cons-last (list atom)
+  (if atom
+      (append list (list atom))
+      list))
 
-(defun phase-table (phase &optional (name-prefix ""))
+(defun phase-table (phase &optional (name-prefix ()))
   (make-instance 'report-table
-		 :name (concatenate-path name-prefix (phase-name phase))
+		 :path (cons-last name-prefix (phase-name phase))
 		 :header (iteration-header (first (phase-iterations phase)))
 		 :lines (map 'array #'iteration-line (phase-iterations phase))))
-
-(defun report-tables (report)
-  (labels 
-      ((phase-tables (phase &optional (prefix ""))
-	 (cons (phase-table phase prefix)
-	       (apply #'append
-		      (mapcar #'(lambda (x) (iteration-tables x (concatenate-path prefix (phase-name phase))))
-			      (phase-iterations phase)))))
-       (iteration-tables (iteration &optional (prefix ""))
-	 (apply #'append (mapcar #'(lambda (x) (phase-tables x (concatenate-path prefix
-										 (iteration-name iteration))))
-				 (iteration-subphases iteration)))))
-    (phase-tables report)))
 
 (defun print-with-padding (string size)
   (let ((string (format nil "~a" string)))
@@ -129,7 +127,7 @@
       (format t "~va~va" before-padding "" after-padding string))))
 
 (defun print-table (table)
-  (format t "~a:~%" (table-name table))
+  (format t "~a:~%" (table-path table))
   (labels ((element-length (array i)
 	     (length (format nil "~a" (aref array i))))
 	   (print-line (line paddings)
@@ -142,4 +140,49 @@
 							 (map 'list #'(lambda (x) (element-length x i))
 							      (table-lines table)))))))
       (print-line (table-header table) column-paddings)
-      (map 'array #'(lambda (x) (print-line x column-paddings)) (table-lines table)))))
+      (map 'array #'(lambda (x) (print-line x column-paddings)) (table-lines table))
+      t)))
+
+(defun phase-goto (phase next)
+  (if (and (= (length (phase-iterations phase)) 1)
+	   (null (iteration-name (first (phase-iterations phase)))))
+      (iteration-goto (first (phase-iterations phase)) next)
+      (if (null next)
+	  phase
+	  (let ((next-iteration (find (first next) (phase-iterations phase) :test #'equal :key #'iteration-name)))
+	    (assert next-iteration)
+	    (iteration-goto next-iteration (rest next))))))
+
+(defun iteration-goto (iteration next)
+  (if (null next)
+      iteration
+      (let ((next-phase (find (first next) (iteration-subphases iteration) :test #'equal :key #'phase-name)))
+	(assert next-phase)
+	(phase-goto next-phase (rest next)))))
+
+(defgeneric ls (object))
+
+(defun print-name (value name-function)
+  (format t "~a~%" (funcall name-function value)))
+
+(defmethod ls ((phase report-phase))
+  (progn
+    (mapc #'(lambda (x) (print-name x #'iteration-name)) (phase-iterations phase))
+    t))
+
+(defmethod ls ((iteration report-iteration))
+  (progn
+    (mapc #'(lambda (x) (print-name x #'phase-name)) (iteration-subphases iteration))
+    t))
+
+(defun ls-path (root path)
+  (ls (phase-goto root path)))
+
+(defmacro move-path (path &optional (next nil))
+  (if next
+      `(setf ,path (cons-last ,path ,next))
+      `(setf ,path (butlast ,path))))
+
+(defun path-table (root path)
+  (phase-table (phase-goto root path)))
+  
