@@ -6,6 +6,6 @@
 	   parse-phase
 	   parse-loop
 	   phase-goto
-	   phase-table))
+	   get-table))
 
 
