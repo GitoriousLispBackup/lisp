@@ -67,8 +67,8 @@
 (defun make-table (path header &rest lines)
   (make-instance 'burning-reports::table
 		 :path path
-		 :header (coerce header 'array)
-		 :lines (map 'array #'(lambda (x) (coerce x 'array)) lines)))
+		 :header (coerce header 'vector)
+		 :lines (map 'vector #'(lambda (x) (coerce x 'vector)) lines)))
 
 (defun !table= (table1 table2)
   (!equal (burning-reports::path table1) (burning-reports::path table2))
