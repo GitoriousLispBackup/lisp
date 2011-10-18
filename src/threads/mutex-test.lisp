@@ -41,3 +41,21 @@
 				     (release-mutex mutex)))))
     (!= result 2)))
     
+(deftest mutex-test simple-shared-variable ()
+  (let ((result (make-shared-variable 0)))
+    (flet ((client ()
+	     (dotimes (i 10)
+	       (thread-random)
+	       (with-shared-variable result
+		 (incf result)))))
+      (let ((threads ()))
+	(dotimes (i 500)
+	  (push (spawn-thread #'client) threads))
+	(apply #'wait-threads threads))
+      (with-shared-variable result
+	(!= result 5000)))))
+
+(deftest mutex-test complex-shared-variable ()
+  (let ((variables (list (make-shared-variable "value"))))
+    (with-shared-variable (value (first variables))
+      (!equal value "value"))))

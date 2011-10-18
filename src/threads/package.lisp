@@ -13,6 +13,8 @@
 	   grab-mutex
 	   release-mutex
 	   with-mutex
+	   make-shared-variable
+	   with-shared-variable
 
 	   make-semaphore
 	   wait-semaphore

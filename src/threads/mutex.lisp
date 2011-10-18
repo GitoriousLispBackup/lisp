@@ -42,3 +42,19 @@
      ,@body)
   #-(or clisp sbcl ccl)
   `(no-threads-error))
+
+(defstruct (shared-variable (:constructor %make-sv))
+  value
+  lock)
+
+(defun make-shared-variable (value &optional (lock (make-mutex)))
+  (%make-sv :value value :lock lock))
+
+(defmacro with-shared-variable (variable &body body)
+  (let ((variable-sym (gensym))
+	(variable-name (if (atom variable) variable (first variable)))
+	(variable-value (if (listp variable) (second variable) variable)))
+    `(with-mutex (shared-variable-lock ,variable-value) 
+       (let ((,variable-sym ,variable-value))
+	 (symbol-macrolet ((,variable-name ,`(shared-variable-value ,variable-sym)))
+	   ,@body)))))
