@@ -7,6 +7,14 @@
 (defun no-threads-error ()
   (error "No threads implementation for ~a." (lisp-implementation-type)))
 
+(defun current-thread ()
+  #+clisp
+  (mt:current-thread)
+  #+sbcl
+  sb-thread:*current-thread*
+  #+ccl
+  ccl:*current-process*)
+
 ;; Makes new thread 
 
 (defun make-thread (function &key (name "unnamed thread") (arguments ()))

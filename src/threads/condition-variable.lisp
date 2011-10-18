@@ -18,8 +18,8 @@
 	       :wait-semaphore (make-semaphore 0)
 	       :accept-semaphore (make-semaphore 0)))
 
-(defun make-condition-variable ()
-  (make-cv :lock (make-mutex)
+(defun make-condition-variable (&optional (lock (make-mutex)))
+  (make-cv :lock lock
 	   :value (do-make-cv)))
 
 (defmacro with-condition-variable (variable &body body)
@@ -58,4 +58,18 @@
       (signal-semaphore (ccl-cv-wait-semaphore variable))
       (wait-semaphore (ccl-cv-accept-semaphore variable)))))
     
-       
+(defun broadcast-condition (variable)
+  #+clisp
+  (mt:exemption-broadcast (cv-value variable))
+  #+sbcl
+  (sb-thread:condition-broadcast (cv-value variable))
+  #+ccl
+  (let ((variable (cv-value variable))
+	(waiters (ccl-cv-waiters variable)))
+    (dotimes (i waiters)
+      (signal-semaphore (ccl-cv-wait-semaphore variable))
+      (decf (ccl-cv-waiters variable)))
+    (dotimes (i waiters)
+      (wait-semaphore (ccl-cv-accept-semaphore variable)))))
+    
+    

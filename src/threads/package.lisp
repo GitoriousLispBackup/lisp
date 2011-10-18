@@ -1,6 +1,7 @@
 (defpackage :burning-threads
   (:use :common-lisp)
-  (:export make-thread
+  (:export current-thread
+	   make-thread
 	   spawn-thread
 	   wait-thread
 	   wait-threads
@@ -20,5 +21,9 @@
 	   make-condition-variable
 	   with-condition-variable
 	   wait-condition
-	   signal-condition))
+	   signal-condition
+	   broadcast-condition
+	   
+	   defmonitor
+	   defmfun))
 

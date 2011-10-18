@@ -9,6 +9,7 @@
 		 (:file "mutex-test" :depends-on ("test-package" "base-test"))
 		 #+(or sbcl ccl)
 		 (:file "semaphore-test" :depends-on ("test-package" "base-test"))
-		 (:file "condition-variable-test" :depends-on ("test-package" "base-test")))
+		 (:file "condition-variable-test" :depends-on ("test-package" "base-test"))
+		 (:file "monitor-test" :depends-on ("test-package" "base-test")))
     :depends-on (:burning-testing :burning-threads))
 
