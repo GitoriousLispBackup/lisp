@@ -58,3 +58,16 @@
        (let ((,variable-sym ,variable-value))
 	 (symbol-macrolet ((,variable-name ,`(shared-variable-value ,variable-sym)))
 	   ,@body)))))
+
+(defmacro do-with-shared-variables ((&rest variables) &body body)
+  (cond
+    ((null variables) `(progn ,@body))
+    ((null (rest variables)) `(with-shared-variable ,(first variables) ,@body))
+    (t `(with-shared-variable ,(first variables)
+	  (do-with-shared-variables ,(rest variables) ,@body)))))
+
+(defmacro with-shared-variables ((&rest variables) &body body)
+  (flet ((symbol< (s1 s2)
+	   (string< (symbol-name s1) (symbol-name s2))))
+    (let ((sorted-variables (sort (copy-tree variables) #'symbol<)))
+      `(do-with-shared-variables ,sorted-variables ,@body))))

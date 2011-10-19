@@ -11,5 +11,6 @@
 		 #+(or sbcl ccl)
 		 (:file "semaphore" :depends-on ("package" "base"))
 		 (:file "condition-variable" :depends-on ("package" "base" "mutex"))
-		 (:file "monitor" :depends-on ("package" "mutex" "condition-variable"))))
+		 (:file "monitor" :depends-on ("package" "mutex" "condition-variable"))
+		 (:file "pipe" :depends-on ("package" "monitor"))))
 

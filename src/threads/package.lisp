@@ -15,6 +15,7 @@
 	   with-mutex
 	   make-shared-variable
 	   with-shared-variable
+	   with-shared-variables
 
 	   make-semaphore
 	   wait-semaphore
@@ -27,5 +28,11 @@
 	   broadcast-condition
 	   
 	   defmonitor
-	   defmfun))
+	   defmfun
+
+	   make-pipe
+	   read-pipe
+	   write-pipe
+	   with-pipe
+	   while-pipe))
 

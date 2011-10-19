@@ -1,6 +1,6 @@
 (in-package :burning-threads)
 
-(defmacro defmonitor (name-and-options &rest slots)
+(defmacro defmonitor (name-and-options &body slots)
   (labels ((condition-p (slot)
 	     (and (not (atom slot))
 		  (find ':condition slot)))
