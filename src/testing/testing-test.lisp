@@ -43,3 +43,15 @@
 
 (deftest test-testing failed-error-test ()
   (!error (+ 2 2) "some error"))
+
+(deftest test-testing condition-test ()
+  (!condition (error "bla bla") simple-error))
+
+(deftest test-testing failed-condition-test ()
+  (!condition (+ 2 2) simple-error))
+
+(deftest test-testing condition-safe-test ()
+  (!condition-safe (+ 2 2)))
+
+(deftest test-testing failed-condition-safe-test ()
+  (!condition-safe (error "Not safe")))

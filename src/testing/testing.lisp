@@ -11,6 +11,8 @@
 	   :!equal
 	   :!equalp
 	   :!<>
+	   :!condition
+	   :!condition-safe
 	   :!error
 	   :run-test
 	   :run-case
@@ -101,13 +103,25 @@
 			      (simple-condition-format-arguments error)))
       str)))
 	    
-
 (defmacro !error (expression message)
   `(handler-case
        (progn ,expression
 	      (check nil (format t "~a failed to die.~%" ',expression)))
      (simple-error (error)
        (!equal (message error) ,message))))
+
+(defmacro !condition (expression condition)
+  `(handler-case
+       (progn ,expression
+	      (check nil (format t "~a failed to die.~%" ',expression)))
+     (,condition ()
+       t)))
+
+(defmacro !condition-safe (expression)
+  `(handler-case
+       ,expression
+     (error (err)
+       (check nil (format t "Died with error ~a.~%" err)))))
 
 (defun prepare-test ()
   (setq *success-tests* 0)
