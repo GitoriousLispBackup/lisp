@@ -1,3 +1,7 @@
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+
 int int_sum( int a, int b )
 {
   return a + b;
@@ -43,7 +47,74 @@ int bool_and( int a, int b )
   return a && b;
 }
 
-int sum_generated ( int (*generator)() )
+int sum_generated( int (*generator)() )
 {
   return (*generator)() + (*generator)();
+}
+
+int double_generated( int (*generator1)(), int (*generator2)() )
+{
+  return sum_generated( generator1 ) + sum_generated( generator2 );
+}
+
+int ranged_generator( int (*generator)( int, int ) )
+{
+  int gen1 = (*generator)( 0, 10 );
+  int gen2 = (*generator)( 20, 100 );
+
+  if( gen1 <0 || gen1 > 10 )
+    return 0;
+  if( gen2 <20 || gen2 > 100 )
+    return 0;
+
+  return 1;
+}
+
+int simple_generator()
+{
+  static int value = -1;
+  value = value + 1;
+
+  return value;
+}
+
+int (*get_generator())()
+{
+  return &simple_generator;
+}
+
+int string_length( const char* string )
+{
+  return strlen( string );
+}
+
+const char* sample_string ()
+{
+  return "Hello, Lisp!!!";
+}
+
+typedef struct
+{
+  int value;
+} int_holder;
+
+int_holder* make_holder()
+{
+  int_holder* ret = malloc( sizeof( int_holder ));
+  return ret;
+}
+
+void delete_holder( int_holder* holder )
+{
+  holder->value = -1; //Let's think that -1 means that we released holder :)
+}
+
+int hld_holded( int_holder* holder )
+{
+  return holder->value;
+}
+
+void hld_set_holded( int_holder* holder, int value )
+{
+  holder->value = value;
 }

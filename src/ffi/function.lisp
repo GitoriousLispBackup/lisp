@@ -1,51 +1,33 @@
 (in-package :burning-ffi)
 
-(defvar *ffi-types* ())
+(defmacro foreign-lambda-wrapper (return-value args)
+  (let ((arg-names (mapcar #'(lambda (x) (gensym (symbol-name x))) args)))
+    `#'(lambda (x)
+	 #'(lambda ,arg-names
+	     (cffi:foreign-funcall-pointer x () ,@(reduce #'append (mapcar #'list args arg-names)) ,return-value)))))
 
-(defun %add-type (external-value internal-value)
-  (if (not (equal (%get-type external-value) internal-value))
-      (pushnew `(,external-value . ,internal-value) *ffi-types*)))
+(defmacro lambda-callback-wrapper (return-value args)
+  `#'(lambda (x)
+       (cffi:get-callback (generate-callback x ',return-value ',args))))
 
-(defun %get-type (external-value)
-  (rest (assoc external-value *ffi-types* :test #'equal)))
+(defun generate-callback (function return-type args)
+  (let ((argument-names (mapcar #'(lambda (x) (gensym (symbol-name x))) args)))
+    (eval `(cffi:defcallback ,(gensym "CALLBACK") ,return-type ,(mapcar #'list argument-names args)
+	     (funcall ,function ,@argument-names)))))
 
-(defmacro deffitype (external-name internal-name)
-  `(%add-type ,external-name ,internal-name))
-
-(defgeneric get-type (name &rest args))
-
-(defmethod get-type (name &rest args)
-  (declare (ignore args))
-  (%get-type name))
-
-(deffitype :void :void)
-(deffitype :bool :boolean)
-(deffitype :int :int)
-(deffitype :short :short)
-(deffitype :long :long)
-(deffitype :uint :uint)
-(deffitype :ushort :ushort)
-(deffitype :ulong :ulong)
-(deffitype :float :float)
-(deffitype :double :double)
-
-(defmacro foreign-lambda-wrapper (return-value &rest args)
-  `(,return-value ,args))
-
-(defmacro lambda-callback-wrapper (return-value &rest args)
-  `(,return-value ,args))
-
-(defun make-functional-type (return-value &rest args)
-  (eval `(cffi:defctype ,(gensym "FUNCTIONAL") 
-	     (:wrapper :pointer 
-		       :from-c (foreign-lambda-wrapper ,return-value ,args)
-		       :to-c (lambda-callback-wrapper ,return-value ,args)))))
+(defun make-functional-type (return-type args)
+  (let ((callback-wrapper (eval `(lambda-callback-wrapper ,return-type ,args)))
+	(foreign-wrapper (eval `(foreign-lambda-wrapper ,return-type ,args))))
+    (eval `(cffi:defctype ,(gensym "FUNCTIONAL") 
+	       (:wrapper :pointer 
+			 :from-c ,foreign-wrapper
+			 :to-c ,callback-wrapper)))))
 
 (defmethod get-type ((name (eql :function)) &rest args)
   (if (%get-type args)
       (%get-type args)
       (progn 
-	(%add-type args (apply #'make-functional-type args))
+	(%add-type args (funcall #'make-functional-type (first args) (second args)))
 	(%get-type args))))
 
 (defun ffi-type (argument)

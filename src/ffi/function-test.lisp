@@ -13,10 +13,23 @@
 	  '(:function ("float_sum" :float) ((a b :float)))
 	  '(:function ("double_sum" :double) ((a b :double)))
 	  '(:function ("bool_and" :bool) ((a b :bool)))
-	  '(:function ("sum_generated" :int) ((generator (:function :int)))))
+	  '(:function ("sum_generated" :int) ((generator (:function :int))))
+	  '(:function ("double_generated" :int) ((generator1 generator2 (:function :int))))
+	  '(:function ("ranged_generator" :int) ((generator (:function :int (:int :int)))))
+	  '(:function ("get_generator" (:function :int)) ())
+	  '(:function ("string_length" :int) ((string :string)))
+	  '(:function ("sample_string" :string) ()))
 
 (deftest function-test wrong-type-test ()
   (!error (load-ffi '(:function ("bla-bla" :very-wrong-type) ())) "Wrong ffi type - VERY-WRONG-TYPE."))
+
+(defun int-generator (first step)
+  (lambda ()
+    (incf first step)
+    (- first step)))
+
+(defun my-ranged-generator (first last)
+  (floor (/ (+ first last) 2)))
 
 (deftest function-test sum-test ()
   (!= (int-sum -2 -2) -4)
@@ -31,4 +44,21 @@
   (!null (bool-and t nil))
   (!null (bool-and nil t))
   (!null (bool-and nil nil)))
+
+(deftest function-test callback-test ()
+  (!= (sum-generated (int-generator 0 1)) 1)
+  (!= (double-generated (int-generator 1 1) (int-generator 3 2)) 11)
+  (!= (ranged-generator #'my-ranged-generator) 1))
+
+(deftest function-test foriegn-fpointer-test ()
+  (let ((generator (get-generator)))
+    (let* ((value1 (funcall generator))
+	   (value2 (funcall generator))
+	   (value3 (funcall generator)))
+      (!= (1+ value1) value2)
+      (!= (1+ value2) value3))))
+
+(deftest function-test string-type-test ()
+  (!= (string-length "bla-bla") 7)
+  (!equal (sample-string) "Hello, Lisp!!!"))
   

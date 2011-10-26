@@ -4,6 +4,32 @@
   (defun intern-keyword (symbol)
     (intern (symbol-name symbol) "KEYWORD")))
 
+(push "~/lisp/src/ffi/c/" cffi:*foreign-library-directories*)
+
+(cffi:define-foreign-library uuid-gen
+  (t (:default "libuuid_gen")))
+
+(cffi:use-foreign-library uuid-gen)
+
+(cffi:defcfun ("generate_uuid" %generate-uuid) :pointer)
+
+(defun generate-uuid ()
+  (labels ((hex-from-char (char)
+	     (cond
+	       ((and (char>= char #\0) (char<= char #\9)) (- (char-code char) (char-code #\0)))
+	       ((and (char>= char #\a) (char<= char #\f)) (+ 10 (- (char-code char) (char-code #\a))))
+	       ((and (char>= char #\A) (char<= char #\F)) (+ 10 (- (char-code char) (char-code #\A))))
+	       (t (error "Wrong hex character ~a." char))))
+	   (hex-list-to-integer (list)
+	     (cond 
+	       ((null list) 0)
+	       ((null (rest list)) (first list))
+	       (t (+ (first list) (* 16 (hex-list-to-integer (rest list))))))))
+    (let* ((pointer (%generate-uuid))
+	   (string (cffi:foreign-string-to-lisp pointer)))
+      (cffi:foreign-free pointer)
+      (hex-list-to-integer (map 'list #'hex-from-char (remove-if #'(lambda (x) (char= x #\-)) string))))))
+
 (defgeneric do-ffi-action (action &rest arguments))
 
 (defmacro defaction (name (&rest arguments) &body body)
@@ -24,7 +50,6 @@
 	(cffi:define-foreign-library ,library
 	  (t (:default ,(concatenate 'string "lib" name))))
 	(cffi:use-foreign-library ,library)))))
-
 
 (defun load-ffi (&rest actions)
   (mapc #'(lambda (x) (apply #'do-ffi-action x)) actions))

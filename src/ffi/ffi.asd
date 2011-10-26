@@ -5,7 +5,10 @@
     :version "0.1"
     :author "Dmitry Sopin <sopindm@gmail.com>"
     :licence "GPL v3"
+    :serial t
     :components ((:file "package")
-		 (:file "core" :depends-on ("package"))
-		 (:file "function" :depends-on ("package" "core")))
+		 (:file "core")
+		 (:file "common-types")
+		 (:file "function")
+		 (:file "object"))
     :depends-on (:cffi))
