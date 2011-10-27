@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include "ffi_object.h"
 
 int int_sum( int a, int b )
 {
@@ -98,10 +99,13 @@ typedef struct
   int value;
 } int_holder;
 
-int_holder* make_holder()
+const unsigned char holder_uuid [] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+const unsigned char mega_holder_uuid [] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 };
+
+void* make_holder()
 {
   int_holder* ret = malloc( sizeof( int_holder ));
-  return ret;
+  return make_object( ret, holder_uuid );
 }
 
 void delete_holder( int_holder* holder )
@@ -117,4 +121,10 @@ int hld_holded( int_holder* holder )
 void hld_set_holded( int_holder* holder, int value )
 {
   holder->value = value;
+}
+
+void* make_mega_holder ()
+{
+  int_holder* ret = malloc( sizeof( int_holder ));
+  return make_object( ret, mega_holder_uuid );
 }

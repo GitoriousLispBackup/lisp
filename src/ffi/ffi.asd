@@ -11,4 +11,4 @@
 		 (:file "common-types")
 		 (:file "function")
 		 (:file "object"))
-    :depends-on (:cffi))
+    :depends-on (:cffi :trivial-garbage))

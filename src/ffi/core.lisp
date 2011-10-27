@@ -4,7 +4,7 @@
   (defun intern-keyword (symbol)
     (intern (symbol-name symbol) "KEYWORD")))
 
-(push "~/lisp/src/ffi/c/" cffi:*foreign-library-directories*)
+(pushnew "~/lisp/src/ffi/c/" cffi:*foreign-library-directories*)
 
 (cffi:define-foreign-library uuid-gen
   (t (:default "libuuid_gen")))
@@ -12,6 +12,24 @@
 (cffi:use-foreign-library uuid-gen)
 
 (cffi:defcfun ("generate_uuid" %generate-uuid) :pointer)
+
+(defun %uuid-list-to-int (uuid)
+  (cond 
+    ((null uuid) 0)
+    ((null (rest uuid)) (first uuid))
+    (t (+ (first uuid) (* 256 (%uuid-list-to-int (rest uuid)))))))
+
+(defun %uuid-int-to-list (uuid &optional (length 16))
+  (cond
+    ((= length 0) ())
+    ((= length 1) (list uuid))
+    (t (append (%uuid-int-to-list (floor (/ uuid 256)) (1- length)) (list (mod uuid 256))))))
+
+(defun get-uuid-from-c (c-uuid)
+  (let ((uuid ()))
+    (dotimes (i 16)
+      (push (cffi:mem-aref c-uuid :uchar i) uuid))
+    (%uuid-list-to-int uuid)))
 
 (defun generate-uuid ()
   (labels ((hex-from-char (char)
