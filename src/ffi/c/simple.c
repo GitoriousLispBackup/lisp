@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "ffi_object.h"
+#include "handler.uuid.h"
 
 int int_sum( int a, int b )
 {
@@ -99,13 +100,10 @@ typedef struct
   int value;
 } int_holder;
 
-const unsigned char holder_uuid [] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-const unsigned char mega_holder_uuid [] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 };
-
 void* make_holder()
 {
   int_holder* ret = malloc( sizeof( int_holder ));
-  return make_object( ret, holder_uuid );
+  return MAKE_OBJECT( ret, int_holder );
 }
 
 void delete_holder( int_holder* holder )
@@ -126,5 +124,25 @@ void hld_set_holded( int_holder* holder, int value )
 void* make_mega_holder ()
 {
   int_holder* ret = malloc( sizeof( int_holder ));
-  return make_object( ret, mega_holder_uuid );
+  return MAKE_OBJECT( ret, mega_holder );
+}
+
+int sum_array( int* array, int size )
+{
+  int sum = 0, i;
+
+  for( i=0; i<size; i++ )
+    sum += array[ i ];
+
+  return sum;
+}
+
+int complex_sum_array( int** arrays, int* sizes, int s_size )
+{
+  int sum = 0, i;
+
+  for( i=0; i<s_size; i++ )
+    sum += sum_array( arrays[ i ], sizes[ i ] );
+
+  return sum;
 }

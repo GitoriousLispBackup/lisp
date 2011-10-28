@@ -10,5 +10,6 @@
 		 (:file "core")
 		 (:file "common-types")
 		 (:file "function")
-		 (:file "object"))
+		 (:file "object")
+		 (:file "array"))
     :depends-on (:cffi :trivial-garbage))

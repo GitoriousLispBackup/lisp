@@ -21,8 +21,9 @@
   (cffi:foreign-free (ffi-object-value object)))
 
 (defun ensure-type (object type)
-  (unless (or (typep object type) (not object))
-    (error "Cannot convert object ~a to type ~a." object type)))
+  (unless (or (typep object type) (null object))
+    (error "Cannot convert object of type ~a to type ~a." (type-of object) type))
+  object)
 
 (cffi:defcstruct c-ffi-object
   (value :pointer)
@@ -32,7 +33,10 @@
   (let ((value (cffi:foreign-slot-value object 'c-ffi-object 'value))
 	(type (cffi:foreign-slot-value object 'c-ffi-object 'type)))
     (cffi:foreign-free object)
-    (make-instance class :raw-value value)))
+    (let ((real-class (gethash (get-uuid-from-c type) *uuid-table*)))
+      (if real-class
+	  (ensure-type (make-instance real-class :raw-value value) class)
+	  (make-instance class :raw-value value)))))
 
 (defun def-class-ctype (class-name)
   (eval `(cffi:defctype ,(gensym (symbol-name class-name)) 
@@ -46,12 +50,17 @@
 				  (if (null x) (cffi:null-pointer) (ffi-object-value x)))))))
 
 (defaction class (name &rest options)
-  (let ((name (intern (c-name-to-lisp name))))
+  (let ((name (intern (c-name-to-lisp name)))
+	(base-classes (mapcar #'(lambda (x) (intern (c-name-to-lisp (second x))))
+			      (remove-if-not #'(lambda (x) (eq (first x) :inherit)) options))))
     (flet ((parse-constructor (constructor-name arguments)
 	     (do-ffi-action :function `(,constructor-name ,name) arguments))
 	   (parse-destructor (destructor-name)
 	     (do-ffi-action :function `(,destructor-name :void) `((object ,name)))))
-      (eval `(defclass ,name (ffi-object) ()))
+      (eval 
+       `(defclass ,name 
+	    ,(if (null base-classes) '(ffi-object) base-classes)
+	  ()))
       (%add-type name (def-class-ctype name))
       (mapc #'(lambda (x) (apply #'parse-constructor (rest x))) 
 	    (remove-if-not #'(lambda (x) (eq (first x) :constructor)) options))
@@ -77,9 +86,9 @@
 
 (defvar *uuid-table* (make-hash-table))
 
-(defgeneric do-generate-uuid (action &rest args))
+(defgeneric do-ffi-generate-uuid (action &rest args))
 
-(defmethod do-generate-uuid (action &rest args)
+(defmethod do-ffi-generate-uuid (action &rest args)
   (declare (ignore action args))
   nil)
 
@@ -93,7 +102,7 @@
 (defun generate-uuid-file (filename &rest actions)
   (let ((uuids (apply #'ffi-generate-uuid actions)))
     (with-open-file (file filename :direction :output :if-exists :supersede)
-      (mapc #'(lambda (x) (format file "~a~%" x)) uuids))
+      (mapc #'(lambda (x) (format file "~s~%" x)) uuids))
     (with-open-file (file (concatenate 'string filename ".h") :direction :output :if-exists :supersede)
       (labels ((print-uuid (uuid)
 		 (cond 
@@ -108,11 +117,17 @@
 
 (defun load-ffi-uuid (&rest actions)
   (mapc #'(lambda (x) (setf (gethash (third x) *uuid-table*)
-			    (intern (c-name-to-lisp (second x))))) actions)
-  (print *uuid-table*))
+			    (intern (c-name-to-lisp (second x))))) actions))
 
+(defun read-uuid-file (filename)
+  (with-open-file (file filename :direction :input)
+    (do ((action (read file nil) (read file nil))
+	 (actions ()))
+	((null action) actions)
+      (push action actions))))
 
-
+(defun load-uuid (filename)
+  (apply #'load-ffi-uuid (read-uuid-file filename)))
 
 
        

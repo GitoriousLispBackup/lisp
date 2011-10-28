@@ -7,5 +7,6 @@
     :components ((:file "test-package")
 		 (:file "library-test" :depends-on ("test-package"))
 		 (:file "function-test" :depends-on ("test-package"))
-		 (:file "object-test" :depends-on ("test-package")))
+		 (:file "object-test" :depends-on ("test-package"))
+		 (:file "array-test" :depends-on ("test-package")))
     :depends-on (:burning-testing :burning-ffi))

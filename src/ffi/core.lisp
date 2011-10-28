@@ -69,6 +69,16 @@
 	  (t (:default ,(concatenate 'string "lib" name))))
 	(cffi:use-foreign-library ,library)))))
 
-(defun load-ffi (&rest actions)
+(defun load-ffi-actions (&rest actions)
   (mapc #'(lambda (x) (apply #'do-ffi-action x)) actions))
+
+(defun read-ffi-file (filename)
+  (with-open-file (file filename :direction :input)
+    (do ((action (read file nil) (read file nil))
+	 (actions ()))
+	((null action) (reverse actions))
+      (push action actions))))
+
+(defun load-ffi (filename)
+  (apply #'load-ffi-actions (read-ffi-file filename)))
 

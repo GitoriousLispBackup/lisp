@@ -4,10 +4,11 @@
 typedef struct
 {
   void* value;
-  unsigned char* type;
+  const unsigned char* type;
 }ffi_object_base, *ffi_object;
 
 ffi_object make_object( void* value, const unsigned char type[] );
+#define MAKE_OBJECT(value, class) make_object( value, class ## _uuid )
 
 #endif
 
