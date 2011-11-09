@@ -7,7 +7,10 @@
     :licence "GPL v3"
     :serial t
     :components ((:file "test-package")
-		 (:file "virtual-filesystem-test"))
+		 (:module "vfs"
+			  :components
+			  ((:file "base-test")
+			   (:file "file-stream-test"))))
     :depends-on (:burning-testing :burning-filesystem))
 
 

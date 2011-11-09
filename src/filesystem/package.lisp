@@ -1,5 +1,5 @@
 (defpackage :burning-filesystem
-  (:use :common-lisp)
+  (:use :common-lisp :trivial-gray-streams)
   (:export make-directory-path
 	   directory-path
 	   directory-host
@@ -25,8 +25,12 @@
 	   fs-make-file
 	   fs-make-directory
 	   fs-open-file
-	   fs-close-file
+	   fs-open-input-stream
+	   fs-open-output-stream
+	   fs-open-io-stream
+	   fs-close-stream
 
 	   common-filesystem
 
-	   make-virtual-filesystem))
+	   make-virtual-filesystem
+	   vfs-cat))

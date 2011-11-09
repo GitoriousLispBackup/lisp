@@ -9,7 +9,12 @@
     :components ((:file "package")
 		 (:file "base-filesystem")
 		 (:file "common-filesystem")
-		 (:file "virtual-filesystem")
-		 (:file "user-interface")))
+		 (:module "vfs" 
+			  :serial t
+			  :components
+			  ((:file "base")
+			   (:file "file-stream")))
+		 (:file "user-interface"))
+    :depends-on (:trivial-gray-streams))
 
 

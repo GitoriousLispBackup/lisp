@@ -141,6 +141,13 @@
     (!equalp (fs-list-directory fs (fs-path-from-string fs "tmp/"))
 	     (list (fs-path-from-string fs "tmp/bla.bla:new")))))
 
-
+(deftest vfs-test file-exists-p-test ()
+  (let ((fs (make-virtual-filesystem)))
+    (fs-make-file fs (fs-path-from-string fs "a-file"))
+    (fs-make-directory fs (fs-path-from-string fs "a-directory/"))
+    (!t (fs-file-exists-p fs (fs-path-from-string fs "/work/a-file")))
+    (!null (fs-directory-exists-p fs (fs-path-from-string fs "/work/a-file/")))
+    (!null (fs-file-exists-p fs (fs-path-from-string fs "/work/a-directory")))
+    (!t (fs-directory-exists-p fs (fs-path-from-string fs "/work/a-directory/")))))
   
 

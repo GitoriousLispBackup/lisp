@@ -13,7 +13,7 @@
   files)
 
 (defstruct (vfs-file (:conc-name vfsf-))
-  (value nil))
+  (value (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character)))
 
 (defun make-virtual-filesystem ()
   (let ((home (make-vfs-directory))
@@ -129,6 +129,12 @@
       ((eq (first path) :relative) (do-find-directory (vfs-current fs) (rest path)))
       (t (error "Wrong directory path specifier - ~a." path)))))
 
+(defun vfs-find-file (fs path)
+  (let ((directory (vfs-find-directory fs (directory-path (file-directory path)))))
+    (rest (assoc (list (file-name path) (file-type path) (file-version path)) 
+		 (vfsd-files directory)
+		 :test #'equal))))
+
 (def-vfs-method fs-list-directory (fs directory-path)
   (flet ((directory-name (dir)
 	   (first (last (directory-path dir))))
@@ -179,4 +185,13 @@
     (setf (vfsd-files parent)
 	  (remove (list (file-name path) (file-type path) (file-version path)) (vfsd-files parent) 
 		  :test #'equal :key #'first))))
+
+(def-vfs-method fs-file-exists-p (fs path)
+  (vfs-find-file fs path))
+
+(def-vfs-method fs-directory-exists-p (fs path)
+  (vfs-find-directory fs (directory-path path)))
     
+(defun vfs-cat (fs path)
+  (vfsf-value (vfs-find-file fs path)))
+

@@ -111,14 +111,14 @@
 (defmethod fs-file-exists-p ((fs (eql 'common-filesystem)) file)
   (let ((found-path (%file-exists-p (to-pathname file))))
     (if (not found-path)
-	(values nil nil)
-	(values (not (%directory-p found-path)) t))))
+	nil
+	(not (%directory-p found-path)))))
 
 (defmethod fs-directory-exists-p ((fs (eql 'common-filesystem)) dir)
   (let ((found-path (%file-exists-p (to-pathname dir))))
     (if (not found-path)
-	(values nil nil)
-	(values (%directory-p found-path) t))))
+        nil 
+	(%directory-p found-path))))
 
 (defmethod fs-list-directory ((fs (eql 'common-filesystem)) dir)
   (%list-directory (to-pathname dir)))
@@ -156,14 +156,12 @@
 			 &key (direction nil direction-p)
 			 (element-type nil element-type-p)
 			 (if-exists nil if-exists-p)
-			 (if-does-not-exist nil if-does-not-exist-p) 
-			 (external-format nil external-format-p))
+			 (if-does-not-exist nil if-does-not-exist-p))
   (apply #'open (to-pathname path)
 	 (append (if direction-p `(:direction ,direction))
 		 (if element-type-p `(:element-type ,element-type))
 		 (if if-exists-p `(:if-exists ,if-exists))
-		 (if if-does-not-exist-p `(:if-does-not-exist ,if-does-not-exist))
-		 (if external-format-p `(:external-format ,external-format)))))
+		 (if if-does-not-exist-p `(:if-does-not-exist ,if-does-not-exist)))))
 
-(defmethod fs-close-file ((fs (eql 'common-filesystem)) path)
-  (close (to-pathname path)))
+(defmethod fs-close-stream ((fs (eql 'common-filesystem)) stream)
+  (close stream))
