@@ -1,0 +1,179 @@
+Command Line and Configuration
+  Supports key, flag and action argument types                            +
+  Automatically adds --help action                                        +
+  Supports integer, float and string argument types                       +
+  Supports argument arrays                                                +
+  Supports configuration files in .ini and .xml formats                   -
+  Supports correctness check for general cases (range of variable,        +
+                                                correctness of filename)  +
+Report generator
+  Supports easy way of gathering work information             +
+  Supports timing of subintervals and loops                   +
+  Supports OpenCL timing                                      -
+  Generates reports in XML formats                            +
+
+XML
+
+Core
+  generalized variables utilities
+  reallocating arrays
+  pattern matching
+  anaforics
+  function builders
+  lazy evaluation (streams?)
+  recursion makers
+  reader-macros
+  destructuring
+  loops
+
+Threads
+  Implementations
+    clisp     -/+
+    sbcl      +
+    clozurecl +
+    ecl       -
+    abcl      -
+  Base threading features  +
+  Mutexes                  +
+  Semaphores               +
+  Conditional variables    +
+  Atomic operations        -
+  Shared variables         +
+  Monitors                 +
+  Chains                   +
+  Error conditions         -
+
+FFI
+  Lisps
+    clisp      +
+    sbcl       +
+    clozurecl  + 
+    ecl        -
+    abcl       -
+  C++
+    gcc
+    VS2010
+    Intel C++ Compiler
+  Declaration
+    lisp              +
+  Generation
+    c++
+  Types
+    void              +
+    bool              +
+    short signed      +
+    signed            +
+    long signed       +
+    short unsigned    +
+    unsigned          +
+    long unsigned     +
+    float             +
+    double            +
+    string            +
+    array
+    functional        +
+      multiple return values -
+      object arguments       +
+      virtual                -
+    class             +
+      inhiertance     +
+  Functions   
+    Constructors      +
+    Destructors       +
+
+Filesystem
+  User interface
+    file-from-string
+    directory-from-string
+    path-to-string
+
+    exist-p
+    correct-file-p
+    correct-directory-p
+    file-p
+    directory-p
+    relative-p
+    absolute-p
+
+    create-file
+    create-directory
+    delete-path
+
+    parent-path
+    root-path
+
+    file-directory
+    file-name
+    file-type
+    file-version
+    directory-host
+    directory-device
+    directory-path
+
+    make-path
+    path+
+
+    list-directory
+    resolve-path
+
+    home-directory
+    current-directory
+
+    open-file
+    close-file
+    with-file
+
+  FS interface
+    fs-path-from-string
+    fs-path-to-string
+
+    fs-file-exists-p
+    fs-directory-exists-p
+    fs-list-directory
+
+    fs-current-directory
+    fs-home-directory
+
+    fs-delete-file
+    fs-delete-directory
+    fs-make-file
+    fs-make-directory
+
+    fs-open-file
+    fs-close-file
+
+  Virtual file system
+    make
+    cd
+    copy
+    move
+
+Networking
+
+Testing
+  fixture support
+  parameterized cases
+  suite customization 
+  threads
+
+Logging
+
+CXXGenerator
+
+Typised lisp
+  Library
+  Language
+
+Grammar parser
+
+HPCFramework
+  CUDA Wrapper
+  OpenCL Wrapper
+  CPU Wrapper
+  Unit testing
+
+Report analyzer
+
+
+
+
