@@ -101,18 +101,32 @@
     (dolist (i (rest (directory-path path)))
       (format stream "~a/" i))))
 
+(defun filestring (path)
+  (with-output-to-string (stream)
+    (when (file-name path)
+      (format stream "~a" (file-name path)))
+    (when (file-type path)
+      (format stream ".~a" (file-type path)))
+    (when (file-version path)
+      (format stream ":~a" (file-version path)))))
+
 (def-vfs-method fs-path-to-string (fs (path file-path))
-  (flet ((print-file (path)
-	   (with-output-to-string (stream)
-	     (when (file-name path)
-	       (format stream "~a" (file-name path)))
-	     (when (file-type path)
-	       (format stream ".~a" (file-type path)))
-	     (when (file-version path)
-	       (format stream ":~a" (file-version path))))))
-    (concatenate 'string
-		 (fs-path-to-string fs (file-directory path))
-		 (print-file path))))
+  (concatenate 'string
+	       (fs-path-to-string fs (file-directory path))
+	       (filestring path)))
+
+(def-vfs-method fs-as-file-path (fs path)
+  (let ((directory (make-directory-path :host (directory-host path)
+					:device (directory-device path)
+					:path (butlast (directory-path path))))
+	(file (parse-file (first (last (directory-path path))))))
+    (setf (file-directory file) directory)
+    file))
+
+(def-vfs-method fs-as-directory-path (fs path)
+  (let ((directory (copy-directory-path (file-directory path))))
+    (setf (directory-path directory) (append (directory-path directory) (list (filestring path))))
+    directory))
 
 (defun vfs-find-directory (fs path)
   (labels 
@@ -164,8 +178,11 @@
     (push (cons (first (last (directory-path path))) (make-vfs-directory))
 	  (vfsd-directories parent))))
 
+(defun find-file-directory (fs path)
+  (vfs-find-directory fs (directory-path (file-directory path))))
+
 (def-vfs-method fs-make-file (fs path)
-  (let ((parent (vfs-find-directory fs (directory-path (file-directory path)))))
+  (let ((parent (find-file-directory fs path)))
     (push (cons (list (file-name path) (file-type path) (file-version path)) (make-vfs-file))
 	  (vfsd-files parent))))
 
@@ -181,7 +198,7 @@
 	  (remove (first (last (directory-path path))) (vfsd-directories parent) :test #'equal :key #'first))))
 
 (def-vfs-method fs-delete-file (fs path)
-  (let ((parent (vfs-find-directory fs (directory-path (file-directory path)))))
+  (let ((parent (find-file-directory fs path)))
     (setf (vfsd-files parent)
 	  (remove (list (file-name path) (file-type path) (file-version path)) (vfsd-files parent) 
 		  :test #'equal :key #'first))))
@@ -195,3 +212,12 @@
 (defun vfs-cat (fs path)
   (vfsf-value (vfs-find-file fs path)))
 
+(def-vfs-method fs-file-replace (fs path action)
+  (if (member action '(:new-version :rename))
+      (let* ((directory (find-file-directory fs path))
+	     (filename (first (assoc (list (file-name path) (file-type path) (file-version path)) 
+				     (vfsd-files directory) :test #'equal))))
+	(setf (first filename) (format nil "~a~:[~;~:*.~a~]" (first filename) (second filename)))
+	(setf (second filename) "bak")
+	(fs-make-file fs path))
+      (call-next-method)))

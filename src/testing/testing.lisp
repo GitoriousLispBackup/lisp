@@ -110,12 +110,17 @@
      (simple-error (error)
        (!equal (message error) ,message))))
 
-(defmacro !condition (expression condition)
-  `(handler-case
-       (progn ,expression
-	      (check nil (format t "~a failed to die.~%" ',expression)))
-     (,condition ()
-       t)))
+(defmacro !condition (expression condition &rest arg-forms)
+  (let ((condition-sym (gensym)))
+    (labels ((do-check-form (reader value &key (test 'eql))
+	     `(,test (,reader ,condition-sym) ,value))
+	     (check-form (form)
+	       (apply #'do-check-form form)))
+      `(handler-case
+	   (progn ,expression
+		  (check nil (format t "~a failed to die.~%" ',expression)))
+	 (,condition (,condition-sym)
+	   ,@(mapcar #'check-form arg-forms))))))
 
 (defmacro !condition-safe (expression)
   `(handler-case

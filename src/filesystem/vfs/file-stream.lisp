@@ -3,14 +3,16 @@
 (defclass vfs-stream (trivial-gray-stream-mixin fundamental-stream)
   ((value :initarg :value :reader vfs-stream-value)
    (position :initarg :position :accessor vfs-stream-position)
-   (length :initarg :length :accessor vfs-stream-length)))
+   (length :initarg :length :accessor vfs-stream-length)
+   (element-length :initarg :element-length :initform 1 :reader vfs-stream-element-length)))
+
+(defclass vfs-output-stream (vfs-stream fundamental-output-stream) ())
 
 (defclass vfs-binary-stream (vfs-stream fundamental-binary-stream)
-  ((element-type :initarg :element-type :reader vfs-stream-element-type)
-   (element-length :initarg :element-length :reader vfs-stream-element-length)))
+  ((element-type :initarg :element-type :reader vfs-stream-element-type)))
 
-(defclass vfs-binary-output-stream (vfs-binary-stream fundamental-output-stream) ())
-(defclass vfs-character-output-stream (vfs-stream fundamental-character-output-stream) ())
+(defclass vfs-binary-output-stream (vfs-binary-stream vfs-output-stream) ())
+(defclass vfs-character-output-stream (vfs-output-stream fundamental-character-output-stream) ())
 
 (defun vfs-element-type (type)
   (cond
@@ -42,7 +44,10 @@
 			    :position position
 			    :length length
 			    :element-type (first type)
-			    :element-length (second type))))))))
+			    :element-length (ceiling (second type) 8))))))))
+
+(defmethod stream-element-type ((stream vfs-binary-stream))
+  (vfs-stream-element-type stream))
 
 (defun vfs-write-character (stream char)
   (with-accessors ((value vfs-stream-value) 
@@ -56,17 +61,37 @@
 	       (incf position)
 	       (incf length)))))
 
+(defgeneric vfs-stream-write-element (stream element))
+
+(defmethod vfs-stream-write-element ((stream vfs-character-output-stream) element)
+  (stream-write-char stream element))
+
+(defmethod vfs-stream-write-element ((stream vfs-binary-output-stream) element)
+  (stream-write-byte stream element))
+
 (defmethod stream-write-char ((stream vfs-character-output-stream) char)
   (vfs-write-character stream char))
 
-(defmethod stream-write-sequence ((stream vfs-character-output-stream) sequence start end &key)
+(defmethod stream-write-sequence ((stream vfs-output-stream) sequence start end &key)
   (dotimes (i (- end start))
-    (stream-write-char stream (elt sequence (+ start i)))))
+    (vfs-stream-write-element stream (elt sequence (+ start i)))))
 
 (def-vfs-method fs-close-stream (fs stream)
   (declare (ignore stream))
   ())
 
 (defmethod stream-write-byte ((stream vfs-binary-output-stream) value)
-  (dotimes (i (ceiling (vfs-stream-element-length stream) 8))
+  (dotimes (i (vfs-stream-element-length stream))
     (vfs-write-character stream (code-char (ldb (byte 8 (* i 8)) value)))))
+
+(def-vfs-method fs-file-length (fs path &optional (element-type 'unsigned-byte))
+  (let ((stream (fs-open-file fs path :direction :input :element-type element-type)))
+    (unwind-protect
+	 (floor (/ (vfs-stream-length stream) (vfs-stream-element-length stream)))
+      (fs-close-stream fs stream))))
+    
+(defmethod stream-file-position ((stream vfs-output-stream))
+  (/ (vfs-stream-position stream) (vfs-stream-element-length stream)))
+
+(defmethod (setf stream-file-position) (value (stream vfs-output-stream))
+  (setf (vfs-stream-position stream) (* value (vfs-stream-element-length stream))))

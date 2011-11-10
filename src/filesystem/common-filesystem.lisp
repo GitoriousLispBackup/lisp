@@ -165,3 +165,13 @@
 
 (defmethod fs-close-stream ((fs (eql 'common-filesystem)) stream)
   (close stream))
+
+(defmethod fs-as-file-path ((fs (eql 'common-filesystem)) directory-path)
+  (from-pathname (%pathname-as-file (to-pathname directory-path))))
+
+(defmethod fs-as-directory-path ((fs (eql 'common-filesystem)) file-path)
+  (from-pathname (%pathname-as-directory (to-pathname file-path))))
+
+(defmethod fs-file-length ((fs (eql 'common-filesystem)) path &optional (element-type 'unsigned-byte))
+  (with-open-file (stream (to-pathname path) :element-type element-type)
+    (file-length stream)))

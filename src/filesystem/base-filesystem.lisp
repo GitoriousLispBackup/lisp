@@ -27,6 +27,10 @@
 		    (type-of name))))
 	 (error "Method ~a isn't implemented for filesystem type ~a." ',name (fs-type ,fs))))))
 
+;;
+;; Filesystem interface
+;;
+
 (def-noimpl-generic fs-path-from-string (fs string))
 (def-noimpl-generic fs-path-to-string (fs path))
 
@@ -55,13 +59,49 @@
 
 (def-noimpl-generic fs-close-stream (fs path))
 
+(def-noimpl-generic fs-file-length (fs path &optional element-type))
+
+;;
+;; Replaces existing file with new one
+;;
+;; Action is one of: :new-version, :rename, :rename-and-delete, :overwrite, :supersede
+
+(defgeneric fs-file-replace (fs path action))
+
+(defmethod fs-file-replace (fs path action)
+  (ecase action
+    ((:new-version :rename :rename-and-delete :supersede) (progn (fs-delete-file fs path)
+								  (fs-make-file fs path)))
+    (:overwrite t)))
+     
+;;
+;; Implementation
+;;
+
 (defmethod fs-open-file (fs path &key 
 			 (direction :input) 
 			 (element-type 'character) 
 			 (if-exists :error)
-			 (if-does-not-exist :default))
-  (ecase direction
-    (:output (unless (fs-file-exists-p fs path)
-	       (fs-make-file fs path))
-	     (fs-open-output-stream fs path :element-type element-type :position :start))))
+			 (if-does-not-exist :create))
+  (let ((position :start))
+    (labels ((check-if-exists ()
+	       (ecase if-exists
+		 (:error (error 'file-error :pathname path))
+		 ((:new-version :rename :rename-and-delete :overwrite :supersede) 
+		  (fs-file-replace fs path if-exists))
+		 (:append (setf position :end))
+		 ((nil) nil)))
+	     (check-if-does-not-exist ()
+	       (ecase if-does-not-exist
+		 (:error (error 'file-error :pathname path))
+		 (:create (fs-make-file fs path)
+			  t)
+		 ((nil) nil)))	       
+	     (check-existance ()
+	       (if (fs-file-exists-p fs path)
+		   (or (member direction '(:input :probe))
+		       (check-if-exists))
+		   (check-if-does-not-exist))))
+      (if (check-existance)
+	  (fs-open-output-stream fs path :element-type element-type :position position)))))
   

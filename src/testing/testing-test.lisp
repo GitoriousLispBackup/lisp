@@ -55,3 +55,7 @@
 
 (deftest test-testing failed-condition-safe-test ()
   (!condition-safe (error "Not safe")))
+
+(deftest test-testing condition-argument-test ()
+  (!condition (error "bla") simple-error 
+	      (simple-condition-format-arguments "bla")))

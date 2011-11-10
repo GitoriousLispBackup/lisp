@@ -2,10 +2,35 @@
 
 (defcase stream-test)
 
+;;
+;; Universal stream tests
+;;
+
+(deftest stream-test file-length-test ()
+  (let ((fs (make-virtual-filesystem)))
+    (let ((char-path (fs-path-from-string fs "char"))
+	  (byte-path (fs-path-from-string fs "byte"))
+	  (2byte-path (fs-path-from-string fs "2byte")))
+      (let ((stream (fs-open-file fs char-path :direction :output :element-type 'character)))
+	(write-string "abcdefgh" stream)
+	(fs-close-stream fs stream))
+      (!= (fs-file-length fs char-path 'character) 8)
+      (let ((stream (fs-open-file fs byte-path :direction :output :element-type 'unsigned-byte)))
+	(write-sequence '(100 200 50 100 10 20 1 2 3 4 5) stream)
+	(fs-close-stream fs stream))
+      (!= (fs-file-length fs byte-path 'unsigned-byte) 11)
+      (let ((stream (fs-open-file fs 2byte-path :direction :output :element-type '(unsigned-byte 16))))
+	(write-sequence '(10000 5000 20000 100 200 10 20 1 2 3 4 5) stream)
+	(fs-close-stream fs stream))
+      (!= (fs-file-length fs 2byte-path '(unsigned-byte 16)) 12))))
+
+;;
+;; Output stream tests
+;;
+
 (deftest stream-test simple-output-stream ()
   (let* ((fs (make-virtual-filesystem))
 	 (path (fs-path-from-string fs "test")))
-    (fs-make-file fs path)
     (let ((stream (fs-open-file fs path :direction :output)))
       (format stream "Hello, virtual file!!!~%")
       (fs-close-stream fs stream))
@@ -13,7 +38,6 @@
 
 (defun test-stream (fs path test value &optional (element-type 'character))
   (let ((path (fs-path-from-string fs path)))
-    (fs-make-file fs path)
     (let ((stream (fs-open-file fs path :direction :output :element-type element-type)))
       (funcall test stream)
       (fs-close-stream fs stream))
@@ -69,7 +93,49 @@
 				 (ldb (byte 8 0) -10000)
 				 (ldb (byte 8 8) -10000)
 				 (ldb (byte 8 16) -10000)))
-		   '(integer -10000 100000)))))
+		   '(integer -10000 100000))
+      (test-stream fs "test5"
+		   #'(lambda (stream)
+		       (write-sequence '(0 1 2 3 4 5) stream))
+		   (result '(0 1 2 3 4 5))
+		   'unsigned-byte)
+      (test-stream fs "test6"
+		   #'(lambda (stream)
+		       (write-sequence '(1 2 3 4 5) stream :start 1 :end 3))
+		   (result '(2 3))
+		   'unsigned-byte))))
+		       
+(deftest stream-test output-stream-file-position ()
+  (let ((fs (make-virtual-filesystem)))
+    (let ((path (fs-path-from-string fs "char")))
+      (let ((stream (fs-open-file fs path :direction :output :element-type 'character)))
+	(!= (file-position stream) 0)
+	(write-string "12345" stream)
+	(!= (file-position stream) 5)
+	(file-position stream 2)
+	(!= (file-position stream) 2)
+	(write-string "678" stream)
+	(!= (file-position stream) 5)
+	(fs-close-stream fs stream))
+      (!equal (vfs-cat fs path) "12678"))
+    (let ((path (fs-path-from-string fs "int")))
+      (let ((stream (fs-open-file fs path :direction :output :element-type '(integer -10000 100000))))
+	(!= (file-position stream) 0)
+	(write-sequence '(-10000 2000) stream)
+	(!= (file-position stream) 2)
+	(file-position stream 1)
+	(!= (file-position stream) 1)
+	(write-sequence '(100000) stream)
+	(!= (file-position stream) 2)
+	(fs-close-stream fs stream))
+      (!equal (vfs-cat fs path) 
+	      (map 'string #'(lambda (x) (code-char x))
+		   (list (ldb (byte 8 0) -10000)
+			 (ldb (byte 8 8) -10000)
+			 (ldb (byte 8 16) -10000)
+			 (ldb (byte 8 0) 100000)
+			 (ldb (byte 8 8) 100000)
+			 (ldb (byte 8 16) 100000)))))))
 
 (deftest stream-test writing-to-new-file ()
   (let* ((fs (make-virtual-filesystem))
@@ -79,7 +145,93 @@
       (fs-close-stream fs stream))
     (!equal (vfs-cat fs path) "some string")))
 
-;;test default if-not-exists
-;;test if-not-exists
+(deftest stream-test writting-if-not-exists ()
+  (let ((fs (make-virtual-filesystem)))
+    (let ((path1 (fs-path-from-string fs "test1"))
+	  (path2 (fs-path-from-string fs "test2"))
+	  (path3 (fs-path-from-string fs "test3")))
+      (!condition (fs-open-file fs path1 :direction :output :if-does-not-exist :error)
+		  file-error (file-error-pathname path1))
+      (fs-open-file fs path2 :direction :output :if-does-not-exist :create)
+      (!t (fs-file-exists-p fs path2))
+      (!null (fs-open-file fs path3 :direction :output :if-does-not-exist nil))
+      (!condition (fs-open-file fs path1 :direction :output :if-does-not-exist :shut-down) error))))
+
+(deftest stream-test output-element-type-test ()
+  (let ((fs (make-virtual-filesystem)))
+    (let ((stream (fs-open-file fs (fs-path-from-string fs "test-char") :direction :output)))
+      (!equal (stream-element-type stream) 'character)
+      (fs-close-stream fs stream))
+    (let ((stream (fs-open-file fs (fs-path-from-string fs "test-byte") 
+				:direction :output
+				:element-type 'unsigned-byte)))
+      (!equal (stream-element-type stream) '(unsigned-byte 8))
+      (fs-close-stream fs stream))
+    (let ((stream (fs-open-file fs (fs-path-from-string fs "test-int")
+				:direction :output
+				:element-type '(integer -12345 123456))))
+      (!equal (stream-element-type stream) '(integer -12345 123456))
+      (fs-close-stream fs stream))))
+  
+(deftest stream-test output-if-exists-default-test ()
+  (let* ((fs (make-virtual-filesystem))
+	 (path (fs-path-from-string fs "file")))
+    (fs-make-file fs path)
+    (!condition (fs-open-file fs path :direction :output)
+		file-error (file-error-pathname path))))
+
+(deftest stream-test output-if-exists-rename-and-error-test ()
+  (let* ((fs (make-virtual-filesystem))
+	 (path (fs-path-from-string fs "file"))
+	 (bak-path (fs-path-from-string fs "file.bak")))
+    (fs-make-file fs path)
+    (!condition (fs-open-file fs path :direction :output :if-exists :error)
+		file-error (file-error-pathname path))
+    (!null (fs-open-file fs path :direction :output :if-exists nil))
+    (flet ((check-rename (option)
+	     (fs-close-stream fs (fs-open-file fs path :direction :output :if-exists option))
+	     (!t (fs-file-exists-p fs path))
+	     (!t (fs-file-exists-p fs bak-path))
+	     (fs-delete-file fs bak-path)))
+      (check-rename :new-version)
+      (check-rename :rename))))
+
+(deftest stream-test output-if-exists-delete-test ()
+  (let* ((fs (make-virtual-filesystem))
+	 (path (fs-path-from-string fs "file")))
+    (flet ((check-delete (option)
+	     (let ((stream (fs-open-file fs path :direction :output)))
+	       (write-string "12345" stream)
+	       (fs-close-stream fs stream))
+	     (fs-close-stream fs (fs-open-file fs path :direction :output :if-exists option))
+	     (!= (fs-file-length fs path) 0)
+	     (fs-delete-file fs path)))
+      (check-delete :rename-and-delete)
+      (check-delete :supersede))))
+
+(deftest stream-test output-if-exists-overwrite-and-append-test ()
+  (let* ((fs (make-virtual-filesystem))
+	 (path (fs-path-from-string fs "file")))
+    (flet ((check-change (option result)
+	     (let ((stream (fs-open-file fs path :direction :output)))
+	       (write-string "12345" stream)
+	       (fs-close-stream fs stream))
+	     (let ((stream (fs-open-file fs path :direction :output :if-exists option)))
+	       (write-string "67" stream)
+	       (fs-close-stream fs stream))
+	     (!equal (vfs-cat fs path) result)
+	     (fs-delete-file fs path)))
+      (check-change :overwrite "67345")
+      (check-change :append "1234567"))))
+
+;;rename test
+
+;;test if-exists
+;;test if-not-exists defaults
 
 ;;input streams
+
+;;test direction defaults
+
+;;io streams
+;;probe streams

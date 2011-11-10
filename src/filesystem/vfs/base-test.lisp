@@ -150,4 +150,9 @@
     (!null (fs-file-exists-p fs (fs-path-from-string fs "/work/a-directory")))
     (!t (fs-directory-exists-p fs (fs-path-from-string fs "/work/a-directory/")))))
   
-
+(deftest vfs-test path-conversion-test ()
+  (let ((fs (make-virtual-filesystem)))
+    (!equalp (fs-as-file-path fs (fs-path-from-string fs "/dir1/dir2/dir3.dir4/"))
+	     (make-fp (make-dp nil nil '(:absolute "dir1" "dir2")) "dir3" "dir4" nil))
+    (!equalp (fs-as-directory-path fs (fs-path-from-string fs "/dir1/dir2/dir3.dir4"))
+	     (make-dp nil nil '(:absolute "dir1" "dir2" "dir3.dir4")))))

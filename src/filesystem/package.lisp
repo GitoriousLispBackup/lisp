@@ -15,6 +15,8 @@
 
 	   fs-path-from-string
 	   fs-path-to-string
+	   fs-as-file-path
+	   fs-as-directory-path
 	   fs-file-exists-p
 	   fs-directory-exists-p
 	   fs-list-directory
@@ -29,6 +31,7 @@
 	   fs-open-output-stream
 	   fs-open-io-stream
 	   fs-close-stream
+	   fs-file-length
 
 	   common-filesystem
 
