@@ -6,6 +6,7 @@
    (length :initarg :length :accessor vfs-stream-length)
    (element-length :initarg :element-length :initform 1 :reader vfs-stream-element-length)))
 
+(defclass vfs-input-stream (vfs-stream fundamental-input-stream) ())
 (defclass vfs-output-stream (vfs-stream fundamental-output-stream) ())
 
 (defclass vfs-binary-stream (vfs-stream fundamental-binary-stream)
@@ -13,6 +14,8 @@
 
 (defclass vfs-binary-output-stream (vfs-binary-stream vfs-output-stream) ())
 (defclass vfs-character-output-stream (vfs-output-stream fundamental-character-output-stream) ())
+
+(defclass vfs-character-input-stream (vfs-input-stream fundamental-character-input-stream) ())
 
 (defun vfs-element-type (type)
   (cond
@@ -25,26 +28,28 @@
 	 (eq (first type) 'unsigned-byte)) (list type (second type)))
     (t (error "Unknown type specifier ~a." type))))
 
-(def-vfs-method fs-open-output-stream (fs path &key element-type position)
+(defun character-type-p (type)
+  (member type '(character base-char standard-char extended-char)))
+
+(def-vfs-method fs-open-stream (fs path direction element-type position)
   (let ((file (vfs-find-file fs path)))
     (let* ((value (vfsf-value file))
 	   (length (length value))
 	   (position (ecase position 
 		       (:start 0)
 		       (:end length))))
-      (cond
-	((eq element-type 'character) 
-	 (make-instance 'vfs-character-output-stream
-			:value value
-			:position position
-			:length length))
-	(t (let ((type (vfs-element-type element-type)))
-	     (make-instance 'vfs-binary-output-stream 
-			    :value value
-			    :position position
-			    :length length
-			    :element-type (first type)
-			    :element-length (ceiling (second type) 8))))))))
+      (if (character-type-p element-type)
+	  (make-instance 'vfs-character-output-stream
+			 :value value
+			 :position position
+			 :length length)
+	  (let ((type (vfs-element-type element-type)))
+	    (make-instance 'vfs-binary-output-stream 
+			   :value value
+			   :position position
+			   :length length
+			   :element-type (first type)
+			   :element-length (ceiling (second type) 8)))))))
 
 (defmethod stream-element-type ((stream vfs-binary-stream))
   (vfs-stream-element-type stream))

@@ -53,10 +53,7 @@
 
 (defgeneric fs-open-file (fs path &key direction element-type if-exists if-does-not-exist))
 
-(def-noimpl-generic fs-open-input-stream (fs path &optional element-type))
-(def-noimpl-generic fs-open-output-stream (fs path &key element-type position))
-(def-noimpl-generic fs-open-io-stream (fs path &key element-type position))
-
+(defgeneric ifs-open-stream (fs path direction element-type position))
 (def-noimpl-generic fs-close-stream (fs path))
 
 (def-noimpl-generic fs-file-length (fs path &optional element-type))
@@ -77,12 +74,15 @@
 ;;
 ;; Implementation
 ;;
+(defconstant if-does-not-exists-default '#:default)
 
 (defmethod fs-open-file (fs path &key 
 			 (direction :input) 
 			 (element-type 'character) 
 			 (if-exists :error)
-			 (if-does-not-exist :create))
+			 (if-does-not-exist if-does-not-exists-default))
+  (when (eq if-does-not-exist if-does-not-exists-default)
+    (setf if-does-not-exist (if (member if-exists '(:overwrite :append)) :error :create)))
   (let ((position :start))
     (labels ((check-if-exists ()
 	       (ecase if-exists
@@ -103,5 +103,8 @@
 		       (check-if-exists))
 		   (check-if-does-not-exist))))
       (if (check-existance)
-	  (fs-open-output-stream fs path :element-type element-type :position position)))))
+	  (ecase direction
+	    (:input (fs-open-stream fs path :input element-type position))
+	    (:output (fs-open-stream fs path :output element-type position)))))))
+
   

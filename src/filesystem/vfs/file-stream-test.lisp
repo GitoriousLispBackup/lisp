@@ -28,6 +28,7 @@
 ;; Output stream tests
 ;;
 
+
 (deftest stream-test simple-output-stream ()
   (let* ((fs (make-virtual-filesystem))
 	 (path (fs-path-from-string fs "test")))
@@ -145,6 +146,7 @@
       (fs-close-stream fs stream))
     (!equal (vfs-cat fs path) "some string")))
 
+
 (deftest stream-test writting-if-not-exists ()
   (let ((fs (make-virtual-filesystem)))
     (let ((path1 (fs-path-from-string fs "test1"))
@@ -172,6 +174,7 @@
 				:element-type '(integer -12345 123456))))
       (!equal (stream-element-type stream) '(integer -12345 123456))
       (fs-close-stream fs stream))))
+
   
 (deftest stream-test output-if-exists-default-test ()
   (let* ((fs (make-virtual-filesystem))
@@ -224,14 +227,56 @@
       (check-change :overwrite "67345")
       (check-change :append "1234567"))))
 
-;;rename test
+(deftest stream-test rename-test ()
+  (let* ((fs (make-virtual-filesystem))
+	 (path (fs-path-from-string fs "/home/file.some.other.info.ext"))
+	 (renamed-path (fs-path-from-string fs "/home/file.some.other.info.ext.bak"))
+	 (twice-renamed-path (fs-path-from-string fs "/home/file.some.other.info.ext.bak.bak")))
+    (flet ((touch-file (path)
+	     (fs-close-stream fs (fs-open-file fs path :direction :output :if-exists :rename))))
+	   (fs-make-file fs path)
+	   (touch-file path)
+	   (!t (fs-file-exists-p fs renamed-path))
+	   (touch-file renamed-path)
+	   (!t (fs-file-exists-p fs twice-renamed-path)))))
 
-;;test if-exists
-;;test if-not-exists defaults
+(deftest stream-test output-if-not-exists-defaults ()
+  (let ((fs (make-virtual-filesystem)))
+    (flet ((test-path (if-exists)
+	     (let ((path (fs-path-from-string fs "test")))
+	       (if (member if-exists '(:overwrite :append))
+		   (!condition (fs-open-file fs path :direction :output :if-exists if-exists)
+			       file-error (file-error-pathname path))
+		   (progn (fs-close-stream fs (fs-open-file fs path :direction :output :if-exists if-exists))
+			  (!t (fs-file-exists-p fs path))
+			  (fs-delete-file fs path))))))
+      (mapcar #'test-path '(:error :new-version :rename :rename-and-delete :overwrite :append :supersede nil)))))
 
-;;input streams
+(defun echo (fs path seq)
+  (let ((stream (fs-open-file fs path :direction :output :element-type (type-of (elt seq 0)))))
+    (write-sequence seq stream)
+    (fs-close-stream fs stream)))
 
+(deftest stream-test simple-string-reading ()
+  (let* ((fs (make-virtual-filesystem))
+	 (path (fs-path-from-string fs "file")))
+    (echo fs path "I am virtual file.")
+    (let ((stream (fs-open-file fs path :direction :input))
+	  (string (make-array 100 :element-type 'character)))
+      (!= (read-sequence string stream) 17)
+      (!equal (subseq string 0 17) "I am virtual file."))))
+
+;;character reading
+;;binary reading
+;;file position
+;;element-type
+;;if-exists ignoring
+;;if-does-not-exists defaults
+
+;;wrong direction test
 ;;test direction defaults
 
 ;;io streams
 ;;probe streams
+;;test stream closing
+;;write locking
