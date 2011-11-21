@@ -13,7 +13,9 @@
   files)
 
 (defstruct (vfs-file (:conc-name vfsf-))
-  (value (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character)))
+  (value (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character))
+  (readers 0)
+  (write-lock-p nil))
 
 (defun make-virtual-filesystem ()
   (let ((home (make-vfs-directory))
@@ -198,7 +200,10 @@
 	  (remove (first (last (directory-path path))) (vfsd-directories parent) :test #'equal :key #'first))))
 
 (def-vfs-method fs-delete-file (fs path)
-  (let ((parent (find-file-directory fs path)))
+  (let ((file (vfs-find-file fs path))
+	(parent (find-file-directory fs path)))
+    (when (or (vfsf-write-lock-p file) (> (vfsf-readers file) 0))
+      (error 'file-lock-error :path path))
     (setf (vfsd-files parent)
 	  (remove (list (file-name path) (file-type path) (file-version path)) (vfsd-files parent) 
 		  :test #'equal :key #'first))))

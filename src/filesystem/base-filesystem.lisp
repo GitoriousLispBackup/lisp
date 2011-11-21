@@ -70,7 +70,14 @@
     ((:new-version :rename :rename-and-delete :supersede) (progn (fs-delete-file fs path)
 								  (fs-make-file fs path)))
     (:overwrite t)))
-     
+  
+;;
+;; Error conditions
+;;
+
+(define-condition file-lock-error (error)
+  ((path :initarg :path :reader file-lock-error-path)))
+   
 ;;
 ;; Implementation
 ;;

@@ -205,8 +205,11 @@
 	     (let ((stream (fs-open-file fs path :direction :output)))
 	       (write-string "12345" stream)
 	       (fs-close-stream fs stream))
+	     (print (burning-filesystem::vfsf-readers (burning-filesystem::vfs-find-file fs path)))
 	     (fs-close-stream fs (fs-open-file fs path :direction :output :if-exists option))
+	     (print (burning-filesystem::vfsf-readers (burning-filesystem::vfs-find-file fs path)))
 	     (!= (fs-file-length fs path) 0)
+	     (print (burning-filesystem::vfsf-readers (burning-filesystem::vfs-find-file fs path)))
 	     (fs-delete-file fs path)))
       (check-delete :rename-and-delete)
       (check-delete :supersede))))
@@ -374,6 +377,17 @@
   (!equal (vfs-cat fs path) "char b string 2"))
 
 ;; binary test
+(def-stream-test io-binary-test
+  (echo fs path '(1 2 3 4 5) 'unsigned-byte)
+  (let ((stream (fs-open-file fs path :direction :io :if-exists :overwrite :element-type 'unsigned-byte))
+	(array (make-array 2)))
+    (read-sequence array stream)
+    (!equalp array #(1 2))
+    (write-byte 10 stream)
+    (read-sequence array stream)
+    (!equalp array #(4 5))
+    (fs-close-stream fs stream))
+  (!equal (vfs-cat fs path) (map 'string #'code-char '(1 2 10 4 5))))
 
 (def-stream-test io-if-exists-default
   (fs-make-file fs path)
@@ -390,8 +404,48 @@
   (let ((new-path (fs-path-from-string fs "newpath")))
     (!null (fs-open-file fs new-path :direction :probe))))
 
-;;test direction defaults
+(def-stream-test default-direction-test
+  (echo fs path "bla")
+  (let ((stream (fs-open-file fs path))
+	(string (make-array 3 :element-type 'character)))
+    (read-sequence string stream)
+    (!equal string "bla")
+    (!condition (write-char #\e stream) error)))
 
-;;test stream closing
+(def-stream-test stream-closing-test
+  (let ((stream (fs-open-file fs path :direction :output)))
+    (write-sequence "blabla" stream)
+    (fs-close-stream fs stream)
+    (write-char #\e stream))
+  (!equal (vfs-cat fs path) "blabla"))
+
+(def-stream-test simple-write-locking 
+  (fs-open-file fs path :direction :output)
+  (!condition (fs-open-file fs path :direction :output :if-exists :overwrite) file-lock-error
+	      (file-lock-error-path path)))
+
+(def-stream-test closing-twice
+  (flet ((open-path ()
+	   (fs-open-file fs path :direction :output :if-exists :overwrite :if-does-not-exist :create)))
+    (let ((stream (open-path)))
+      (fs-close-stream fs stream)
+      (open-path)
+      (fs-close-stream fs stream)
+      (!condition (open-path) file-lock-error))))
+
+(def-stream-test deleting-locked-file
+  (fs-open-file fs path :direction :input :if-does-not-exist :create)
+  (!condition (fs-delete-file fs path) file-lock-error 
+	      (file-lock-error-path path)))
+
+(def-stream-test no-read-locking
+  (fs-make-file fs path)
+  (fs-open-file fs path :direction :input)
+  (!condition-safe (fs-open-file fs path :direction :input)))
+
+;;read-write locking
+;;lock releasing
+
 ;;write locking
 ;;probe doesn't lock
+;;probing locked file

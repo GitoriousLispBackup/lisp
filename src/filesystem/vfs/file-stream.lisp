@@ -5,7 +5,8 @@
 ;;
 
 (defclass vfs-stream (trivial-gray-stream-mixin fundamental-stream)
-  ((value :initarg :value :reader vfs-stream-value)
+  ((value :initarg :value :accessor vfs-stream-value)
+   (file :initarg :file :accessor vfs-stream-file)
    (position :initarg :position :accessor vfs-stream-position)
    (length :initarg :length :accessor vfs-stream-length)
    (element-length :initarg :element-length :initform 1 :reader vfs-stream-element-length)))
@@ -20,10 +21,11 @@
 (defclass vfs-binary-output-stream (vfs-binary-stream vfs-output-stream) ())
 (defclass vfs-character-output-stream (vfs-output-stream vfs-character-stream) ())
 
-(defclass vfs-binary-input-stream (vfs-binary-stream vfs-output-stream) ())
+(defclass vfs-binary-input-stream (vfs-binary-stream vfs-input-stream) ())
 (defclass vfs-character-input-stream (vfs-input-stream vfs-character-stream) ())
 
 (defclass vfs-character-io-stream (vfs-character-input-stream vfs-character-output-stream) ())
+(defclass vfs-binary-io-stream (vfs-binary-input-stream vfs-binary-output-stream) ())
 
 (defun vfs-element-type (type)
   (cond
@@ -69,14 +71,37 @@
 			 :element-type (first type)
 			 :element-length (ceiling (second type) 8))))))
 
+(defun vfs-file-locked-p (file output-direction-p)
+  (or (vfsf-write-lock-p file)
+      (and output-direction-p (> (vfsf-readers file) 0))))
+
+(defun vfs-lock-file (file output-direction-p)
+  (if output-direction-p 
+      (setf (vfsf-write-lock-p file) t)
+      (incf (vfsf-readers file))))
+
+(defun vfs-unlock-file (file output-direction-p)
+  (if output-direction-p
+      (setf (vfsf-write-lock-p file) nil)
+      (decf (vfsf-readers file))))
+
 (def-vfs-method fs-open-stream (fs path direction element-type position)
-  (let ((file (vfs-find-file fs path)))
+  (let ((file (vfs-find-file fs path))
+	(output-direction-p (member direction '(:output :io))))
     (let* ((value (vfsf-value file))
 	   (length (length value))
 	   (position (ecase position 
 		       (:start 0)
 		       (:end length))))
-      (vfs-open-stream direction value position length element-type))))
+      (when (and (vfs-file-locked-p file output-direction-p)
+		 (not (eq direction :probe)))
+	(error 'file-lock-error :path path))
+      (vfs-lock-file file output-direction-p)
+      (let ((stream  (vfs-open-stream direction value position length element-type)))
+	(setf (vfs-stream-file stream) file)
+	(when (eq direction :probe)
+	  (fs-close-stream fs stream))
+	stream))))
 
 (def-vfs-method fs-file-length (fs path &optional (element-type 'unsigned-byte))
   (let ((stream (fs-open-file fs path :element-type element-type)))
@@ -85,8 +110,11 @@
       (fs-close-stream fs stream))))
 
 (def-vfs-method fs-close-stream (fs stream)
-  (declare (ignore stream))
-  ())
+  (setf (vfs-stream-value stream) (make-array 0 :adjustable t :fill-pointer 0))
+  (let ((file (vfs-stream-file stream)))
+    (when file
+      (vfs-unlock-file file (typep stream 'vfs-output-stream))
+      (setf (vfs-stream-file stream) nil))))
 
 ;;
 ;; Generic streams

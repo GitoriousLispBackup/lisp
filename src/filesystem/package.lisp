@@ -13,6 +13,9 @@
 	   file-type
 	   file-version
 
+	   file-lock-error
+	   file-lock-error-path
+
 	   fs-path-from-string
 	   fs-path-to-string
 	   fs-as-file-path
