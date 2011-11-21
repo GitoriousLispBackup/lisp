@@ -4,6 +4,7 @@
   (:export :defcase
 	   :deftest
 	   :!t
+	   :!not
 	   :!null
 	   :!=
 	   :equal-check
@@ -73,6 +74,9 @@
 
 (defmacro !t (expr) 
   `(check ,expr (format t "~a is nil.~%" ',expr)))
+
+(defmacro !not (expr)
+  `(!null ,expr))
 
 (defmacro !null (expr)
   `(check (not ,expr) (format t "~a is not nil.~%" ',expr)))

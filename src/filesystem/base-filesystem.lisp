@@ -82,7 +82,11 @@
 			 (if-exists :error)
 			 (if-does-not-exist if-does-not-exists-default))
   (when (eq if-does-not-exist if-does-not-exists-default)
-    (setf if-does-not-exist (if (member if-exists '(:overwrite :append)) :error :create)))
+    (setf if-does-not-exist 
+	  (ecase direction
+	    (:input :error)
+	    ((:output :io) (if (member if-exists '(:overwrite :append)) :error :create))
+	    (:probe nil))))
   (let ((position :start))
     (labels ((check-if-exists ()
 	       (ecase if-exists
@@ -103,8 +107,7 @@
 		       (check-if-exists))
 		   (check-if-does-not-exist))))
       (if (check-existance)
-	  (ecase direction
-	    (:input (fs-open-stream fs path :input element-type position))
-	    (:output (fs-open-stream fs path :output element-type position)))))))
+	  (fs-open-stream fs path direction element-type position)))))
+
 
   

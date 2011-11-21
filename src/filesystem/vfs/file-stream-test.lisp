@@ -175,7 +175,6 @@
       (!equal (stream-element-type stream) '(integer -12345 123456))
       (fs-close-stream fs stream))))
 
-  
 (deftest stream-test output-if-exists-default-test ()
   (let* ((fs (make-virtual-filesystem))
 	 (path (fs-path-from-string fs "file")))
@@ -252,31 +251,147 @@
 			  (fs-delete-file fs path))))))
       (mapcar #'test-path '(:error :new-version :rename :rename-and-delete :overwrite :append :supersede nil)))))
 
-(defun echo (fs path seq)
-  (let ((stream (fs-open-file fs path :direction :output :element-type (type-of (elt seq 0)))))
+(defun echo (fs path seq &optional (element-type 'character))
+  (let ((stream (fs-open-file fs path :direction :output :element-type element-type)))
     (write-sequence seq stream)
     (fs-close-stream fs stream)))
 
-(deftest stream-test simple-string-reading ()
-  (let* ((fs (make-virtual-filesystem))
-	 (path (fs-path-from-string fs "file")))
-    (echo fs path "I am virtual file.")
-    (let ((stream (fs-open-file fs path :direction :input))
-	  (string (make-array 100 :element-type 'character)))
-      (!= (read-sequence string stream) 17)
-      (!equal (subseq string 0 17) "I am virtual file."))))
+(defmacro def-stream-test (name &body body)
+  `(deftest stream-test ,name ()
+     (let* ((fs (make-virtual-filesystem))
+	    (path (fs-path-from-string fs "file")))
+       ,@body)))
 
-;;character reading
-;;binary reading
-;;file position
-;;element-type
-;;if-exists ignoring
-;;if-does-not-exists defaults
+(def-stream-test simple-string-reading
+  (echo fs path "I am virtual file.")
+  (let ((stream (fs-open-file fs path :direction :input))
+	(string (make-array 100 :element-type 'character)))
+    (!= (read-sequence string stream) 18)
+    (!equal (subseq string 0 18) "I am virtual file.")))
 
-;;wrong direction test
+(def-stream-test character-reading
+  (echo fs path (format nil "blablaCHARA one simple string~%Another simple string"))
+  (let ((stream (fs-open-file fs path :direction :input))
+	(string (make-array 100 :element-type 'character)))
+    (!= (read-sequence string stream :start 0 :end 3) 3)
+    (!equal (subseq string 0 3) "bla")
+    (!= (read-sequence string stream :start 3 :end 6) 3)
+    (!equal (subseq string 0 6) "blabla")
+    (!eq (read-char stream) #\C)
+    (!eq (read-char stream) #\H)
+    (!eq (read-char stream) #\A)
+    (!eq (read-char stream) #\R)
+    (!equal (read-line stream) "A one simple string")
+    (!equal (read-line stream) "Another simple string")))
+
+(def-stream-test peeking-test
+  (echo fs path "ab")
+  (let ((stream (fs-open-file fs path :direction :input)))
+    (flet ((test-char (char)
+	     (dotimes (i 10)
+	       (!eq (peek-char nil stream) char))
+	     (!eq (read-char stream) char)))
+      (test-char #\a)
+      (test-char #\b))))
+
+(def-stream-test char-eof-test
+  (fs-make-file fs path)
+  (let ((stream (fs-open-file fs path :direction :input)))
+    (!null (read-char stream nil))))
+
+(def-stream-test binary-reading
+  (declare (ignore path))
+  (let ((byte-path (fs-path-from-string fs "byte")))
+    (echo fs byte-path '(100 200 50 100 10) 'unsigned-byte)
+    (let ((stream (fs-open-file fs byte-path :direction :input :element-type 'unsigned-byte)))
+      (!= (read-byte stream) 100)
+      (let ((seq (make-array 5 :element-type 'unsigned-byte :initial-element 0)))
+	(!= (read-sequence seq stream :start 1 :end 4) 3)
+	(!equalp seq #(0 200 50 100 0)))
+      (!= (read-byte stream) 10)))
+  (let ((2byte-path (fs-path-from-string fs "2byte")))
+    (echo fs 2byte-path '(1000 -2000 10000) '(signed-byte 16))
+    (let ((stream (fs-open-file fs 2byte-path :direction :input :element-type '(signed-byte 16))))
+      (!= (read-byte stream) 1000)
+      (!= (read-byte stream) -2000)
+      (!= (read-byte stream) 10000)))
+  (let ((int-path (fs-path-from-string fs "int")))
+    (echo fs int-path '(-10000 100000 -1000) '(integer -10000 100000))
+    (let ((stream (fs-open-file fs int-path :direction :input :element-type '(integer -10000 100000))))
+      (!= (read-byte stream) -10000)
+      (!= (read-byte stream) 100000)
+      (!= (read-byte stream) -1000))))
+
+(def-stream-test binary-eof-test 
+  (fs-make-file fs path)
+  (!null (read-byte (fs-open-file fs path :direction :input :element-type 'signed-byte) nil)))
+
+(def-stream-test input-file-position 
+  (echo fs path "a simple file")
+  (let ((stream (fs-open-file fs path :direction :input))
+	(string (make-array 5 :initial-element #\Space :element-type 'character)))
+    (!= (file-position stream) 0)
+    (read-sequence string stream :end 5)
+    (!= (file-position stream) 5)
+    (file-position stream 2)
+    (!= (file-position stream) 2)
+    (read-sequence string stream)
+    (!= (file-position stream) 7)
+    (!equal string "simpl")
+    (read-sequence string stream)
+    (!= (file-position stream) 12)
+    (!equal string "e fil")
+    (read-sequence string stream)
+    (!= (file-position stream) 13)
+    (!equal string "e fil")))
+
+(def-stream-test if-exist-ignoring 
+  (fs-make-file fs path)
+  (!condition-safe (fs-open-file fs path :direction :input :if-exists :error)))
+
+(def-stream-test input-if-does-not-exists-defaults
+  (!condition (fs-open-file fs path :direction :input) file-error
+	      (file-error-pathname path)))
+
+;;
+;; io streams
+;;
+
+(def-stream-test io-character-test
+  (echo fs path "char a string 1")
+  (let ((stream (fs-open-file fs path :direction :io :if-exists :overwrite))
+	(string (make-array 8 :element-type 'character :initial-element #\Space)))
+    (read-sequence string stream :start 0 :end 4)
+    (!equal string "char    ")
+    (file-position stream 7)
+    (read-sequence string stream :start 2 :end 8)
+    (!equal string "chstring")
+    (file-position stream 5)
+    (write-char #\b stream)
+    (file-position stream 14)
+    (write-char #\2 stream)
+    (fs-close-stream fs stream))
+  (!equal (vfs-cat fs path) "char b string 2"))
+
+;; binary test
+
+(def-stream-test io-if-exists-default
+  (fs-make-file fs path)
+  (!condition (fs-open-file fs path :direction :io) file-error 
+	      (file-error-pathname path)))
+
+(def-stream-test io-if-does-not-exist-default 
+  (!condition-safe (fs-close-stream fs (fs-open-file fs path :direction :io)))
+  (!t (fs-file-exists-p fs path)))
+
+(def-stream-test probe-stream-test
+  (fs-make-file fs path)
+  (!not (null (fs-open-file fs path :direction :probe)))
+  (let ((new-path (fs-path-from-string fs "newpath")))
+    (!null (fs-open-file fs new-path :direction :probe))))
+
 ;;test direction defaults
 
-;;io streams
-;;probe streams
 ;;test stream closing
 ;;write locking
+;;probe doesn't lock
