@@ -376,7 +376,6 @@
     (fs-close-stream fs stream))
   (!equal (vfs-cat fs path) "char b string 2"))
 
-;; binary test
 (def-stream-test io-binary-test
   (echo fs path '(1 2 3 4 5) 'unsigned-byte)
   (let ((stream (fs-open-file fs path :direction :io :if-exists :overwrite :element-type 'unsigned-byte))
@@ -398,11 +397,23 @@
   (!condition-safe (fs-close-stream fs (fs-open-file fs path :direction :io)))
   (!t (fs-file-exists-p fs path)))
 
+;;
+;; probe streams
+;;
+
 (def-stream-test probe-stream-test
   (fs-make-file fs path)
   (!not (null (fs-open-file fs path :direction :probe)))
   (let ((new-path (fs-path-from-string fs "newpath")))
     (!null (fs-open-file fs new-path :direction :probe))))
+
+(def-stream-test binary-probe-streams
+  (fs-make-file fs path)
+  (!not (null (fs-open-file fs path :direction :probe :element-type 'unsigned-byte))))
+
+;;
+;; General tests
+;;
 
 (def-stream-test default-direction-test
   (echo fs path "bla")
@@ -443,9 +454,35 @@
   (fs-open-file fs path :direction :input)
   (!condition-safe (fs-open-file fs path :direction :input)))
 
-;;read-write locking
-;;lock releasing
+(def-stream-test reading-locking
+  (fs-make-file fs path)
+  (fs-open-file fs path :direction :input)
+  (!condition (fs-open-file fs path :direction :output :if-exists :overwrite) file-lock-error))
 
-;;write locking
-;;probe doesn't lock
-;;probing locked file
+(def-stream-test no-read-with-write
+  (fs-open-file fs path :direction :output)
+  (!condition (fs-open-file fs path :direction :input) file-lock-error))
+
+(def-stream-test write-lock-releasing
+  (fs-close-stream fs (fs-open-file fs path :direction :output))
+  (!condition-safe (fs-open-file fs path :direction :input)))
+    
+(def-stream-test read-lock-releasing
+  (let ((stream1 (fs-open-file fs path :direction :input :if-does-not-exist :create))
+	(stream2 (fs-open-file fs path :direction :input :if-does-not-exist :create)))
+    (fs-close-stream fs stream1)
+    (fs-close-stream fs stream2)
+    (!condition-safe (fs-close-stream fs (fs-open-file fs path :direction :input)))
+    (!condition-safe (fs-close-stream fs (fs-open-file fs path :direction :output :if-exists :overwrite)))))
+
+
+(def-stream-test probe-does-not-lock
+  (fs-make-file fs path)
+  (fs-open-file fs path :direction :probe)
+  (!condition-safe (fs-close-stream fs (fs-open-file fs path :direction :input)))
+  (!condition-safe (fs-close-stream fs (fs-open-file fs path :direction :output :if-exists :overwrite))))
+
+(def-stream-test probing-locked-file
+  (fs-open-file fs path :direction :output)
+  (!not (null (fs-open-file fs path :direction :probe))))
+
