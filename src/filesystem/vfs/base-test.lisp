@@ -2,8 +2,8 @@
 
 (defcase vfs-test)
 
-(defun make-dp (host device path &optional (filesystem nil))
-  (make-directory-path :host host :device device :path path :filesystem filesystem))
+(defun make-dp (host device path)
+  (make-directory-path :host host :device device :path path))
 
 (defun make-fp (directory name type version)
   (make-file-path :directory directory :name name :type type :version version))

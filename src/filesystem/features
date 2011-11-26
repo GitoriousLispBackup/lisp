@@ -1,0 +1,62 @@
+User interface
+  path-from-string +
+  path-to-string   +
+
+  path-exist-p
+  correct-file-path-p
+  correct-directory-path-p
+  file-path-p
+  directory-path-p
+  relative-path-p
+  absolute-path-p
+
+  create-file
+  create-directory
+  delete-path
+
+  parent-path
+  root-path
+
+  file-directory
+  file-name
+  file-type
+  file-version
+  directory-host
+  directory-device
+  directory-path
+
+  make-path
+  path+ 
+
+  list-directory
+  resolve-path
+
+  home-directory
+  current-directory
+
+  open-file
+  close-stream
+  with-file
+
+FS interface
+  fs-path-from-string 
+  fs-path-to-string   
+
+  fs-file-exists-p       
+  fs-directory-exists-p  
+  fs-list-directory
+
+  fs-current-directory
+  fs-home-directory
+
+  fs-delete-file
+  fs-delete-directory
+  fs-make-file
+  fs-make-directory
+
+  fs-open-file
+  fs-close-file
+
+Virtual file system
+  make +
+  cd   

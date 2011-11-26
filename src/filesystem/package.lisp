@@ -13,8 +13,15 @@
 	   file-type
 	   file-version
 
+	   path-from-string
+	   path-to-string
+
+	   path-exists-p
+
 	   file-lock-error
 	   file-lock-error-path
+	   wrong-filename-error
+	   wrong-filename-error-string
 
 	   fs-path-from-string
 	   fs-path-to-string

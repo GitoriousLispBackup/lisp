@@ -10,7 +10,8 @@
 		 (:module "vfs"
 			  :components
 			  ((:file "base-test")
-			   (:file "file-stream-test"))))
+			   (:file "file-stream-test")))
+		 (:file "user-interface-test"))
     :depends-on (:burning-testing :burning-filesystem))
 
 

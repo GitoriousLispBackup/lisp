@@ -1,7 +1,6 @@
 (in-package :burning-filesystem)
 
 (defstruct (directory-path (:conc-name directory-))
-  filesystem
   host
   device
   path)
