@@ -190,12 +190,23 @@
 (defmethod stream-read-char ((stream vfs-character-input-stream))
   (vfs-read-character stream))
 
+(defmethod stream-read-line ((stream vfs-character-input-stream))
+  (do ((char (vfs-read-character stream) (vfs-read-character stream))
+       (string (make-array 0 :element-type 'character :fill-pointer 0 :adjustable t)))
+      ((or (eq char :eof) (char= char #\Newline)) string)
+    (vector-push-extend char string)))
+
 (defmethod stream-unread-char ((stream vfs-character-input-stream) char)
   (declare (ignore char))
   (when (= (vfs-stream-position stream) 0)
     (error "Cannot unread character in empty stream."))
   (decf (vfs-stream-position stream)))
   
+(defmethod stream-peek-char ((stream vfs-character-input-stream))
+  (let ((char (stream-read-char stream)))
+    (stream-unread-char stream char)
+    char))
+
 (defmethod stream-read-byte ((stream vfs-binary-input-stream))
   (let ((value (do ((value 0)
 		    (i 0 (incf i)))

@@ -28,7 +28,6 @@
 ;; Output stream tests
 ;;
 
-
 (deftest stream-test simple-output-stream ()
   (let* ((fs (make-virtual-filesystem))
 	 (path (fs-path-from-string fs "test")))
@@ -73,6 +72,7 @@
 		   #'(lambda (stream)
 		       (write-byte -100 stream)
 		       (write-byte 100 stream))
+
 		   (result `(,(ldb (byte 8 0) -100) 100))
 		   'signed-byte)
       (test-stream fs "test3"

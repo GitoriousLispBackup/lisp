@@ -1,11 +1,11 @@
 (in-package :burning-filesystem)
 
-(defstruct (directory-path (:conc-name directory-))
+(defstruct (directory-path (:conc-name directory-) (:predicate %directory-path-p))
   host
   device
   path)
 
-(defstruct (file-path (:conc-name file-))
+(defstruct (file-path (:conc-name file-) (:predicate %file-path-p))
   directory
   name
   type
@@ -80,14 +80,13 @@
 ;;
 ;; Implementation
 ;;
-(defconstant if-does-not-exists-default '#:default)
 
 (defmethod fs-open-file (fs path &key 
 			 (direction :input) 
 			 (element-type 'character) 
 			 (if-exists :error)
-			 (if-does-not-exist if-does-not-exists-default))
-  (when (eq if-does-not-exist if-does-not-exists-default)
+			 (if-does-not-exist 'if-does-not-exist-default))
+  (when (eq if-does-not-exist 'if-does-not-exist-default)
     (setf if-does-not-exist 
 	  (ecase direction
 	    (:input :error)

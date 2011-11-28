@@ -79,6 +79,157 @@
     (!not (path-exists-p path1-as-directory))
     (!not (path-exists-p path3))))
 
-;;directory path exists-p
-;;path-exists-p in non-existing directory
+(def-ui-test directory-path-exists-p-test
+  (let ((path1 (path-from-string "directory/" :fs fs))
+	(inner-path1 (fs-path-from-string fs "directory/"))
+	(absolute-path1 (path-from-string "/work/directory/" :fs fs))
+	(path1-fileform (path-from-string "/work/directory" :fs fs))
+	(path2 (path-from-string "other.directory/" :fs fs)))
+    (fs-make-directory fs inner-path1)
+    (!t (path-exists-p path1))
+    (!t (path-exists-p absolute-path1))
+    (!not (path-exists-p path1-fileform))
+    (!not (path-exists-p path2))))
+
+(def-ui-test path-exists-p-in-non-existing-directory
+  (let ((path1 (path-from-string "dir/file" :fs fs))
+	(path2 (path-from-string "dir/dir/" :fs fs)))
+    (!not (path-exists-p path1))
+    (!not (path-exists-p path2))))
+
+(def-ui-test make-file-test
+  (let ((path (path-from-string "a.file" :fs fs)))
+    (make-file path)
+    (!t (path-exists-p path))))
+
+(def-ui-test make-file-recursive-test
+  (let ((path (path-from-string "/dir1/dir2/an.inner.file" :fs fs)))
+    (make-file path :recursive t)
+    (!t (path-exists-p path)))
+  (let ((path (path-from-string "dir.a/dir.b/dir.c/an.another.inner.file" :fs fs)))
+    (make-file path :recursive t)
+    (!t (path-exists-p path))))
+
+(def-ui-test make-file-in-non-existing-directory-error
+  (let ((dir (path-from-string "dir/" :fs fs))
+	(path (path-from-string "dir/file" :fs fs)))
+    (!condition (make-file path) directory-does-not-exist-error
+		(directory-does-not-exist-error-path dir))))
+
+(def-ui-test make-directory-test
+  (let ((path (path-from-string "a.directory/" :fs fs)))
+    (make-directory path)
+    (!t (path-exists-p path))))
+
+(def-ui-test make-directory-recursive-test
+  (let ((path (path-from-string "/dir1/dir2/an.inner.directory/" :fs fs)))
+    (make-directory path :recursive t)
+    (!t (path-exists-p path)))
+  (let ((path (path-from-string "dir.a/dir.b/dir.c/inner.directory/" :fs fs)))
+    (make-directory path :recursive t)
+    (!t (path-exists-p path))))
+
+(def-ui-test make-directory-in-non-existing-directory
+  (let ((parent (path-from-string "outer.dir/" :fs fs))
+	(path (path-from-string "outer.dir/inner.dir/" :fs fs)))
+    (!condition (make-directory path) directory-does-not-exist-error
+		(directory-does-not-exist-error-path parent))))
+
+(def-ui-test correct-file-path-on-existing-file 
+  (let ((path (path-from-string "a.file" :fs fs)))
+    (make-file path)
+    (!t (correct-path-p path))))
+
+(def-ui-test correct-file-path-on-existing-directory-path
+  (let ((path (path-from-string "a.file" :fs fs))
+	(path-as-directory (path-from-string "a.file/" :fs fs)))
+    (make-directory path-as-directory)
+    (!not (correct-path-p path))))
+
+(def-ui-test correct-directory-path-on-existing-directory
+  (let ((path (path-from-string "a.dir/" :fs fs)))
+    (make-directory path)
+    (!t (correct-path-p path))))
+
+(def-ui-test correct-directory-path-on-existing-file
+  (let ((path (path-from-string "a.dir/" :fs fs))
+	(path-as-file (path-from-string "a.dir" :fs fs)))
+    (make-file path-as-file)
+    (!not (correct-path-p path))))
+
+(def-ui-test correct-path-p-in-existing-directory
+  (let ((path (path-from-string "/home/a.file" :fs fs)))
+    (!t (correct-path-p path))))
+
+(def-ui-test correct-path-p-in-non-existing-directory
+  (let ((path (path-from-string "/dir/file" :fs fs)))
+    (!not (correct-path-p path))))
+
+(defmacro path-check (name function result)
+  `(!equalp (,function (path-from-string ,name :fs fs))
+	    (path-from-string ,result :fs fs)))
+
+(defmacro !parent= (name parent)
+  `(path-check ,name parent-path ,parent))
+
+(def-ui-test parent-path-for-file
+  (!parent= "a.file" "")
+  (!parent= "dir1/dir2/file.ext" "dir1/dir2/")
+  (!parent= "/dir/file.ext" "/dir/"))
+
+(def-ui-test parent-path-for-directory
+  (!parent= "a.dir/" "")
+  (!parent= "/a.dir/" "/")
+  (!parent= "dir1/dir2/" "dir1/")
+  (!parent= "/dir.a/dir.b/" "/dir.a/")
+  (!null (parent-path (path-from-string "" :fs fs)))
+  (!null (parent-path (path-from-string "/" :fs fs))))
+
+(defmacro !as-file= (name file-name)
+  `(path-check ,name path-as-file ,file-name))
+
+(def-ui-test file-path-as-file
+  (!as-file= "a.file" "a.file")
+  (!as-file= "dir/file" "dir/file")
+  (!as-file= "/dir/file" "/dir/file"))
+
+(def-ui-test directory-path-as-file
+  (!as-file= "dir/" "dir")
+  (!as-file= "/dir/" "/dir")
+  (let ((path (path-from-string "" :fs fs)))
+    (!condition (path-as-file path) wrong-file-path-error
+		(wrong-file-path-error-path path)))
+  (let ((path (path-from-string "/" :fs fs)))
+    (!condition (path-as-file path) wrong-file-path-error
+		(wrong-file-path-error-path path))))
+
+
+(defmacro !as-directory= (name directory-name)
+  `(path-check ,name path-as-directory ,directory-name))
+
+(def-ui-test file-path-as-directory
+  (!as-directory= "file" "file/")
+  (!as-directory= "/file" "/file/")
+  (!as-directory= "dir/file" "dir/file/")
+  (!as-directory= "/dir/file" "/dir/file/"))
+
+(def-ui-test directory-path-as-directory
+  (!as-directory= "dir/" "dir/")
+  (!as-directory= "/dir/" "/dir/")
+  (!as-directory= "dir1/dir2/" "dir1/dir2/")
+  (!as-directory= "/dir1/dir2/" "/dir1/dir2/"))
+
+(def-ui-test path-type-p-test
+  (let ((paths (mapcar #'(lambda (x) (path-from-string x :fs fs)) '("file" "/file" "/dir/file" "dir/file"))))
+    (!every #'file-path-p paths)
+    (!every #'(lambda (x) (not (directory-path-p x))) paths))
+  (let ((paths (mapcar #'(lambda (x) (path-from-string x :fs fs)) '("dir/" "/dir/" "/dir1/dir2/" "dir1/dir2/"))))
+    (!every #'directory-path-p paths)
+    (!every #'(lambda (x) (not (file-path-p x))) paths)))
+
+
+
+
+
+
 	  

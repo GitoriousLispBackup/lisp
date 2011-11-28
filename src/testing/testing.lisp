@@ -15,6 +15,8 @@
 	   :!condition
 	   :!condition-safe
 	   :!error
+	   :!every
+	   :!some
 	   :run-test
 	   :run-case
 	   :run-tests))
@@ -131,6 +133,22 @@
        ,expression
      (error (err)
        (check nil (format t "Died with error ~a.~%" err)))))
+
+(defmacro !every (lambda list)
+  (let ((list-sym (gensym))
+	(lambda-sym (gensym)))
+    `(let ((,list-sym ,list)
+	   (,lambda-sym ,lambda))
+       (check (every ,lambda-sym ,list-sym) 
+	 (format t "~a is not true for all members of ~a." ,lambda-sym ,list-sym)))))
+
+(defmacro !some (lambda list)
+  (let ((list-sym (gensym))
+	(lambda-sym (gensym)))
+    `(let ((,list-sym ,list)
+	   (,lambda-sym ,lambda))
+       (check (some ,lambda-sym ,list-sym)
+	 (format t "~a if false for all members of ~a." ,lambda-sym ,list-sym)))))
 
 (defun prepare-test ()
   (setq *success-tests* 0)

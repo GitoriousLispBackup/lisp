@@ -16,12 +16,30 @@
 	   path-from-string
 	   path-to-string
 
+	   file-path-p
+	   directory-path-p
+
+	   parent-path
+	   root-path
+	   make-path
+	   path+
+	   path-as-file
+	   path-as-directory
+
 	   path-exists-p
+	   correct-path-p
+
+	   make-file
+	   make-directory
 
 	   file-lock-error
 	   file-lock-error-path
 	   wrong-filename-error
 	   wrong-filename-error-string
+	   directory-does-not-exist-error
+	   directory-does-not-exist-error-path
+	   wrong-file-path-error
+	   wrong-file-path-error-path
 
 	   fs-path-from-string
 	   fs-path-to-string
