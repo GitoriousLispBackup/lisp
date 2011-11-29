@@ -203,7 +203,6 @@
     (!condition (path-as-file path) wrong-file-path-error
 		(wrong-file-path-error-path path))))
 
-
 (defmacro !as-directory= (name directory-name)
   `(path-check ,name path-as-directory ,directory-name))
 
@@ -227,9 +226,94 @@
     (!every #'directory-path-p paths)
     (!every #'(lambda (x) (not (file-path-p x))) paths)))
 
+(def-ui-test make-directory-path-test 
+  (declare (ignore fs))
+  (let* ((base-directory (%make-up (make-directory-path :host 'a-host :device 'a-device :path 'a-path) fs))
+	 (directory (copy-path base-directory)))
+    (!eq (path-host directory) 'a-host)
+    (!eq (path-device directory) 'a-device)
+    (!eq (path-path directory) 'a-path))
+  (let* ((default-directory (%make-up (make-dp 'default-host 'default-device 'default-path) fs))
+	 (directory (copy-path default-directory :new-device 'my-device)))
+    (!eq (path-host directory) 'default-host)
+    (!eq (path-device directory) 'my-device)
+    (!eq (path-path directory) 'default-path)))
 
+(def-ui-test make-file-path-test
+  (declare (ignore fs))
+  (let ((directory (make-dp 'a-host 'a-device 'a-path)))
+    (let* ((base-path (%make-up (make-fp directory 'name 'my-type 'the-best-choose) fs))
+	   (path (copy-path base-path)))
+      (!equalp (path-directory path) (%make-up directory fs))
+      (!eq (path-name path) 'name)
+      (!eq (path-type path) 'my-type)
+      (!eq (path-version path) 'the-best-choose))
+    (let* ((default-path (%make-up (make-fp directory 'default-name 'default-type 'default-version) fs))
+	   (path (copy-path default-path :new-name 'my-name)))
+      (!equalp (path-directory path) (%make-up directory fs))
+      (!eq (path-name path) 'my-name)
+      (!eq (path-type path) 'default-type)
+      (!eq (path-version path) 'default-version))))
 
+(defmacro !root= (name root-name)
+  `(path-check ,name root-path ,root-name))
 
+(def-ui-test root-path-test
+  (!root= "a.file" "")
+  (!root= "many/long/relative/directories/a.file" "")
+  (!root= "/absolute.file" "/")
+  (!root= "/many/long/absolute/directories/a.file" "/")
+  (!root= "a.relative.directory/" "")
+  (!root= "a/long/path/to/relative/directory/" "")
+  (!root= "/an.absolute.directory/" "/")
+  (!root= "/a/very/long/path/to/absolute/directory/" "/"))
 
+(defmacro !path= (path1 path2)
+  `(!equalp ,path1 ,path2))
+
+(def-ui-test directory-concatenation
+  (let ((r-dir1 (path-from-string "dir1/dir2/" :fs fs))
+	(r-dir2 (path-from-string "dir3/dir4/" :fs fs))
+	(a-dir1 (path-from-string "/a.dir/b.dir/" :fs fs))
+	(a-dir2 (path-from-string "/c.dir/d.dir/" :fs fs)))
+    (!path= (path+ r-dir1 r-dir2) (path-from-string "dir1/dir2/dir3/dir4/" :fs fs))
+    (!path= (path+ a-dir1 r-dir1) (path-from-string "/a.dir/b.dir/dir1/dir2/" :fs fs))
+    (!path= (path+ a-dir1 a-dir2) (path-from-string "/c.dir/d.dir/" :fs fs))
+    (!path= (path+ r-dir1 a-dir2) (path-from-string "/c.dir/d.dir/" :fs fs))))
+
+(def-ui-test directory-file-concatenation
+  (let ((r-dir (path-from-string "dir1/dir2/" :fs fs))
+	(a-dir (path-from-string "/dir1/dir2/" :fs fs))
+	(r-file (path-from-string "dir/file" :fs fs))
+	(a-file (path-from-string "/dir/file.ext" :fs fs)))
+    (!path= (path+ r-dir r-file) (path-from-string "dir1/dir2/dir/file" :fs fs))
+    (!path= (path+ r-dir a-file) (path-from-string "/dir/file.ext" :fs fs))
+    (!path= (path+ a-dir r-file) (path-from-string "/dir1/dir2/dir/file" :fs fs))
+    (!path= (path+ a-dir a-file) a-file)
+    (!path= (path+ a-file a-file) a-file)
+    (!path= (path+ a-file r-file) r-file)
+    (!path= (path+ r-file a-file) a-file)
+    (!path= (path+ r-file r-file) r-file)
+    (!path= (path+ a-file r-dir) r-dir)
+    (!path= (path+ r-file r-dir) r-dir)
+    (!path= (path+ a-dir r-dir r-dir r-file) (path-from-string "/dir1/dir2/dir1/dir2/dir1/dir2/dir/file" :fs fs))))
+
+(def-ui-test properties-concatenation 
+  (let ((directory1 (%make-up (make-dp 'host1 'device1 '(:absolute "dir1" "dir2")) fs))
+	(directory2 (%make-up (make-dp 'host2 'device2 '(:relative "dir3" "dir4")) fs)))
+    (let ((file1 (copy-path directory1 :new-name 'name1 :new-type 'type1 :new-version 'version1))
+	  (file2 (copy-path directory2 :new-name 'name2 :new-type 'type2 :new-version 'version2)))
+      (!path= (path+ directory1 file2) 
+	      (copy-path directory1 
+			 :new-path '(:absolute "dir1" "dir2" "dir3" "dir4") 
+			 :new-name 'name2
+			 :new-type 'type2
+			 :new-version 'version2))
+      (!path= (path+ directory2 file1)
+	      (copy-path file1 :new-device 'device2 :new-host 'host2))
+      (!path= (path+ directory1 directory2)
+	      (copy-path directory1 :new-path '(:absolute "dir1" "dir2" "dir3" "dir4")))
+      (!path= (path+ directory2 directory1)
+	      (copy-path directory2 :new-path (path-path directory1))))))
 
 	  

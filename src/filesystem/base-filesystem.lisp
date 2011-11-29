@@ -1,11 +1,13 @@
 (in-package :burning-filesystem)
 
-(defstruct (directory-path (:conc-name directory-) (:predicate %directory-path-p))
+(defstruct (directory-path (:conc-name directory-) 
+			   (:predicate %directory-path-p))
   host
   device
   path)
 
-(defstruct (file-path (:conc-name file-) (:predicate %file-path-p))
+(defstruct (file-path (:conc-name file-) 
+		      (:predicate %file-path-p))
   directory
   name
   type

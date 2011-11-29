@@ -34,6 +34,71 @@
 ;; Path utitlity functions
 ;;
 
+(defun copy-path (path &key 
+		  (new-directory nil directory-p)
+		  (new-host nil host-p)
+		  (new-device nil device-p)
+		  (new-path nil path-p)
+		  (new-name nil name-p)
+		  (new-type nil type-p)
+		  (new-version nil version-p))
+  (labels ((copy-directory (path)
+	     (let ((directory (if directory-p (ui-path-path new-directory) (copy-directory-path path))))
+	       (when host-p (setf (directory-host directory) new-host))
+	       (when device-p (setf (directory-device directory) new-device))
+	       (when path-p (setf (directory-path directory) new-path))
+	       directory))
+	   (copy-file (path)
+	     (when (%directory-path-p path)
+	       (setf path (make-file-path :directory path)))
+	     (let ((file (copy-file-path path)))
+	       (setf (file-directory file) (copy-directory (file-directory file)))
+	       (when name-p (setf (file-name file) new-name))
+	       (when type-p (setf (file-type file) new-type))
+	       (when version-p (setf (file-version file) new-version))
+	       file)))
+    (let ((file-p (or (file-path-p path) name-p type-p version-p)))
+      (bind-ui-path (path fs) path
+	(if file-p
+	    (make-ui-path :path (copy-file path) :filesystem fs)
+	    (make-ui-path :path (copy-directory path) :filesystem fs))))))
+
+(defmacro path-cond (var file-expr directory-expr)
+  (let ((var-sym (gensym)))
+    `(let ((,var-sym ,var))
+       (cond
+	 ((file-path-p ,var-sym) ,file-expr)
+	 ((directory-path-p ,var-sym) ,directory-expr)))))
+
+(defun path-host (path)
+  (directory-host (ui-path-path (path-directory path))))
+
+(defun path-device (path)
+  (directory-device (ui-path-path (path-directory path))))
+
+(defun path-path (path)
+  (directory-path (ui-path-path (path-directory path))))
+
+(defun path-directory (path)
+  (path-cond path
+	     (make-ui-path :path (file-directory (ui-path-path path)) :filesystem (ui-path-filesystem path))
+	     path))
+
+(defun path-name (path)
+  (path-cond path
+	     (file-name (ui-path-path path))
+	     nil))
+
+(defun path-type (path)
+  (path-cond path
+	     (file-type (ui-path-path path))
+	     nil))
+
+(defun path-version (path)
+  (path-cond path
+	     (file-version (ui-path-path path))
+	     nil))
+
 (defun %parent-directory (path)
   (let ((parent (copy-directory-path path)))
     (if (rest (directory-path parent))
@@ -53,6 +118,10 @@
 		      ((%directory-path-p path) (%parent-directory path)))))
       (if path (make-ui-path :path path :filesystem fs) nil))))
 
+(defun root-path (path)
+  (let ((path (path-directory path)))
+    (copy-path path :new-path (list (first (path-path path))))))
+
 (define-condition wrong-file-path-error (error)
   ((path :initarg :path :reader wrong-file-path-error-path)))
 
@@ -70,11 +139,18 @@
       (bind-ui-path (path fs) path
 	(make-ui-path :path (fs-as-directory-path fs path) :filesystem fs))))
 
-;  root-path
-
-;  make-path
-;  path+ 
-
+(defun path+ (&rest paths)
+  (labels ((merge-paths (path1 path2)
+	     (cond
+	       ((eq (first path2) :absolute) path2)
+	       (t (append path1 (rest path2)))))
+	   (directory+ (dir1 dir2)
+	     (copy-path dir1 :new-path (merge-paths (path-path dir1) (path-path dir2))))
+	   (file+ (path1 path2)
+	     (if (file-path-p path1)
+		 path2
+		 (copy-path path2 :new-directory (directory+ (path-directory path1) (path-directory path2))))))
+    (reduce #'file+ paths)))
 
 ;;
 ;; Checking paths
@@ -100,9 +176,16 @@
     ((path-exists-p (path-as-directory path)) nil)
     (t (path-exists-p (parent-path path)))))
 
-;  relative-path-p
-;  absolute-path-p
+(defun relative-path-p (path)
+  (ecase (first (path-path path))
+    (:relative t)
+    (:absolute nil)))
 
+(defun absolute-path-p (path)
+  (ecase (first (path-path path))
+    (:relative nil)
+    (:absolute t)))
+	   
 ;;
 ;; Making and deleting filesystem objects
 ;;

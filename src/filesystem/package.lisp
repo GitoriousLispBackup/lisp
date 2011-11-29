@@ -19,12 +19,22 @@
 	   file-path-p
 	   directory-path-p
 
+	   path-host
+	   path-device
+	   path-path
+	   path-directory
+	   path-name
+	   path-type
+	   path-version
+
 	   parent-path
 	   root-path
-	   make-path
+	   copy-path
 	   path+
 	   path-as-file
 	   path-as-directory
+	   relative-path-p
+	   absolute-path-p
 
 	   path-exists-p
 	   correct-path-p
