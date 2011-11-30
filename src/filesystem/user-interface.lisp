@@ -219,15 +219,33 @@
   (bind-ui-path (path fs) path
     (fs-delete-file fs path)))
 
-(defun remove-directory (path recursive-p)
-  (bind-ui-path (path fs) path
-    (fs-delete-directory fs path)))
+(define-condition directory-not-empty-error (error)
+  ((path :initarg :path :reader directory-not-empty-error-path)))
+
+(defun remove-directory (path &optional (recursive-p nil))
+  (flet ((remove-path (path)
+	   (path-cond path
+		      (remove-file path)
+		      (remove-directory path t))))
+    (unless (path-exists-p path)
+      (error 'directory-does-not-exist-error :path path))
+    (when (list-directory path)
+      (if recursive-p 
+	  (mapc #'remove-path (list-directory path))
+	  (error 'directory-not-empty-error :path path)))
+    (bind-ui-path (path fs) path
+      (fs-delete-directory fs path))))
 
 ;;
 ;; Working with files tree
 ;;
 
-;  list-directory
+(defun list-directory (path &optional (recursive-p nil))
+  (bind-ui-path (path fs) path
+    (mapcar #'(lambda (x) 
+		(make-ui-path :path x :filesystem fs)) 
+	    (fs-list-directory fs path))))
+
 ;  resolve-path
 
 ;;

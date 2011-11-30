@@ -121,7 +121,7 @@
 	(%directory-p found-path))))
 
 (defmethod fs-list-directory ((fs (eql 'common-filesystem)) dir)
-  (%list-directory (to-pathname dir)))
+  (mapcar #'from-pathname (%list-directory (to-pathname dir))))
 
 (defmethod fs-current-directory ((fs (eql 'common-filesystem)))
   #+clisp

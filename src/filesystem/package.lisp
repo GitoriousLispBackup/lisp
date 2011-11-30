@@ -50,6 +50,8 @@
 	   wrong-filename-error-string
 	   directory-does-not-exist-error
 	   directory-does-not-exist-error-path
+	   directory-not-empty-error
+	   directory-not-empty-error-path
 	   file-does-not-exist-error
 	   file-does-not-exist-error-path
 	   wrong-file-path-error

@@ -337,13 +337,52 @@
     (fail-test "home")
     (fail-test "dir/file.ext")))
 
-;;simply delete directory
-;;delete relative directory
-;;delete absolute directory
-;;delete directory with files fail
-;;recursive delete directory with files 
-;;delete directory with subdirectories fail
-;;recursive delete directory with subdirectories
-;;delete non-existing directory fail 	     
+(def-ui-test delete-directory-test
+  (flet ((delete-test (name)
+	   (let ((path (path-from-string name :fs fs)))
+	     (make-directory path)
+	     (!t (path-exists-p path))
+	     (remove-directory path)
+	     (!null (path-exists-p path)))))
+    (delete-test "a.dir/")
+    (make-directory (path-from-string "dir/" :fs fs))
+    (delete-test "dir/other.dir/")
+    (delete-test "/work/a.sample.dir/")))
+    
+(def-ui-test delete-directory-with-files-fail-test
+  (let ((path (path-from-string "dir/" :fs fs)))
+    (make-directory path)
+    (make-file (path-from-string "dir/a.file" :fs fs))
+    (!condition (remove-directory path) directory-not-empty-error
+		(directory-not-empty-error-path path))))
 
-	  
+(def-ui-test delete-directory-with-subdirectories-fail-test
+  (let ((path (path-from-string "dir/" :fs fs)))
+    (make-directory path)
+    (make-directory (path-from-string "dir/a.subdirectory/" :fs fs))
+    (!condition (remove-directory path) directory-not-empty-error
+		(directory-not-empty-error-path path))))
+
+(def-ui-test delete-not-existing-directory-fail
+  (let ((path (path-from-string "a.dir/" :fs fs)))
+    (!condition (remove-directory path)	directory-does-not-exist-error
+		(directory-does-not-exist-error-path path))))
+
+(def-ui-test delete-directory-recursive-test
+  (let ((path (path-from-string "dir/" :fs fs))
+	(file-path (path-from-string "dir/file" :fs fs))
+	(subdir-path (path-from-string "dir/subdir/" :fs fs))
+	(subdir-file-path (path-from-string "dir/subdir/file" :fs fs)))
+    (make-directory path)
+    (make-file file-path)
+    (make-directory subdir-path)
+    (make-file subdir-file-path)
+    (!condition-safe (remove-directory path t))))
+
+;;recursive delete directory with subdirectories
+
+;;list empty directory
+;;list directory with files
+;;list directory with files and subdirectories
+;;list big directory recursive
+;;list non-existing directory
