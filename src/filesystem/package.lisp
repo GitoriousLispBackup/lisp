@@ -41,6 +41,8 @@
 
 	   make-file
 	   make-directory
+	   remove-file
+	   remove-directory
 
 	   file-lock-error
 	   file-lock-error-path
@@ -48,6 +50,8 @@
 	   wrong-filename-error-string
 	   directory-does-not-exist-error
 	   directory-does-not-exist-error-path
+	   file-does-not-exist-error
+	   file-does-not-exist-error-path
 	   wrong-file-path-error
 	   wrong-file-path-error-path
 

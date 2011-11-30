@@ -316,4 +316,34 @@
       (!path= (path+ directory2 directory1)
 	      (copy-path directory2 :new-path (path-path directory1))))))
 
+(def-ui-test delete-file-test
+  (flet ((delete-test (name)
+	   (let ((path (path-from-string name :fs fs)))
+	     (make-file path)
+	     (!t (path-exists-p path))
+	     (remove-file path)
+	     (!null (path-exists-p path)))))
+    (delete-test "file.ext")
+    (delete-test "/home/file.ext")
+    (make-directory (path-from-string "dir/" :fs fs))
+    (delete-test "dir/file.ext")))
+
+(def-ui-test delete-file-fail-test
+  (flet ((fail-test (name)
+	   (let ((path (path-from-string name :fs fs)))
+	     (!condition (remove-file path) file-does-not-exist-error
+			 (file-does-not-exist-error-path path)))))
+    (fail-test "file.ext")
+    (fail-test "home")
+    (fail-test "dir/file.ext")))
+
+;;simply delete directory
+;;delete relative directory
+;;delete absolute directory
+;;delete directory with files fail
+;;recursive delete directory with files 
+;;delete directory with subdirectories fail
+;;recursive delete directory with subdirectories
+;;delete non-existing directory fail 	     
+
 	  

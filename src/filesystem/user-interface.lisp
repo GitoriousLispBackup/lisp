@@ -210,8 +210,18 @@
   (bind-ui-path (path fs) path
     (fs-make-directory fs path)))
 
-; delete-file
-; delete-directory
+(define-condition file-does-not-exist-error (error) 
+  ((path :initarg :path :reader file-does-not-exist-error-path)))
+
+(defun remove-file (path)
+  (unless (path-exists-p path)
+    (error 'file-does-not-exist-error :path path))
+  (bind-ui-path (path fs) path
+    (fs-delete-file fs path)))
+
+(defun remove-directory (path recursive-p)
+  (bind-ui-path (path fs) path
+    (fs-delete-directory fs path)))
 
 ;;
 ;; Working with files tree
