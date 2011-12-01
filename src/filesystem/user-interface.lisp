@@ -241,27 +241,108 @@
 ;;
 
 (defun list-directory (path &optional (recursive-p nil))
-  (bind-ui-path (path fs) path
-    (mapcar #'(lambda (x) 
-		(make-ui-path :path x :filesystem fs)) 
-	    (fs-list-directory fs path))))
+  (unless (path-exists-p path)
+    (error 'directory-does-not-exist-error :path path))
+  (labels ((do-list-directory (path)
+	     (bind-ui-path (path fs) path
+	       (mapcar #'(lambda (x) 
+			   (make-ui-path :path x :filesystem fs)) 
+		       (fs-list-directory fs path))))
+	   (filter-files (list)
+	     (remove-if-not #'file-path-p list))
+	   (list-subdirectories (list)
+	     (apply #'append (mapcar #'(lambda (dir) (list-directory dir t)) 
+				     (remove-if-not #'directory-path-p list)))))
+    (if recursive-p 
+	(let ((dir-list (do-list-directory path)))
+	  (append (filter-files dir-list) (list-subdirectories dir-list)))
+	(do-list-directory path))))
 
-;  resolve-path
+(defun match-pattern (pattern string &optional (p-index 0) (s-index 0))
+  (let ((pattern-empty-p (= p-index (length pattern)))
+	(string-empty-p (= s-index (length string))))
+    (cond
+      ((and pattern-empty-p string-empty-p) t)
+      (pattern-empty-p nil)
+      (string-empty-p (and (char= (char pattern p-index) #\*) (match-pattern pattern string (1+ p-index) s-index)))
+      ((char= (char pattern p-index) #\*) (or (match-pattern pattern string (1+ p-index) (1+ s-index))
+					      (match-pattern pattern string p-index (1+ s-index))))
+      ((char= (char pattern p-index) #\?) (match-pattern pattern string (1+ p-index) (1+ s-index)))
+      (t (and (char= (char pattern p-index) (char string s-index)) 
+	      (match-pattern pattern string (1+ p-index) (1+ s-index)))))))
+
+(defun %resolve-file-path (path)
+  (labels ((filestring (path)
+	     (format nil "~a.~a" (path-name path) (path-type path)))
+	   (do-resolve (dir path)
+	     (let ((files (remove-if-not #'file-path-p (list-directory dir))))
+	       (remove-if-not #'(lambda (file) (match-pattern (filestring path) (filestring file))) files))))
+    (apply #'append (mapcar #'(lambda (dir) (do-resolve dir path)) 
+			    (resolve-path (parent-path path))))))
+
+(defun %resolve-directory-path (path)
+  (labels ((name (path)
+	     (first (last (path-path path))))
+	   (do-resolve (dir path)
+	     (let ((dirs (remove-if-not #'directory-path-p (list-directory dir))))
+	       (remove-if-not #'(lambda (dir) (match-pattern (name path) (name dir))) dirs))))
+    (let ((parent (parent-path path)))
+      (if parent
+	  (apply #'append (mapcar #'(lambda (dir) (do-resolve dir path))
+				  (resolve-path (parent-path path))))
+	  (if (path-exists-p path) (list path) nil)))))
+
+(defun resolve-path (path)
+  (path-cond path
+	     (%resolve-file-path path)
+	     (%resolve-directory-path path)))
 
 ;;
 ;; Standart directories
 ;;
 
-;  home-directory
-;  current-directory
+(defun home-directory (fs)
+  (make-ui-path :path (fs-home-directory fs) :filesystem fs))
+
+(defun current-directory (fs)
+  (make-ui-path :path (fs-current-directory fs) :filesystem fs))
 
 ;;
 ;; Working with streams
 ;;
 
-;  open-file
-;  close-stream
-;  with-file
+(defun open-file (path &key 
+		  (direction nil direction-p) 
+		  (element-type nil element-p) 
+		  (if-exists nil if-exists-p)
+		  (if-does-not-exist nil if-does-not-exist-p))
+  (bind-ui-path (path fs) path
+    (apply #'fs-open-file fs path 
+	   (append (if direction-p `(:direction ,direction))
+		   (if element-p `(:element-type ,element-type))
+		   (if if-exists-p `(:if-exists ,if-exists))
+		   (if if-does-not-exist-p `(:if-does-not-exist ,if-does-not-exist))))))
+
+(defun close-stream (stream &optional (fs 'common-filesystem))
+  (fs-close-stream fs stream))
+
+(defmacro with-file ((stream path &key 
+			     (direction nil direction-p) 
+			     (element-type nil element-p)
+			     (if-exists nil if-exists-p)
+			     (if-does-not-exist nil if-does-not-exist-p)) 
+		     &body body)
+  (let ((path-sym (gensym)))
+    `(let ((,path-sym ,path))
+       (let ((,stream (open-file ,path-sym
+				 ,@(if direction-p `(:direction ,direction))
+				 ,@(if element-p `(:element-type ,element-type))
+				 ,@(if if-exists-p `(:if-exists ,if-exists))
+				 ,@(if if-does-not-exist-p `(:if-does-not-exist ,if-does-not-exist)))))
+	 (unwind-protect (progn ,@body)
+	   (bind-ui-path (path fs) ,path-sym
+	     (close-stream ,stream fs)))))))
+
 
 
 

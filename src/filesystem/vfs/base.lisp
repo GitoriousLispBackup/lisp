@@ -6,7 +6,10 @@
 
 (defstruct (virtual-filesystem (:constructor %make-virtual-filesystem) (:conc-name vfs-))
   root
-  current)
+  current-path)
+
+(defun vfs-current (fs)
+  (vfs-find-directory fs (directory-path (vfs-current-path fs))))
 
 (defstruct (vfs-directory (:conc-name vfsd-))
   directories
@@ -18,13 +21,12 @@
   (write-lock-p nil))
 
 (defun make-virtual-filesystem ()
-  (let ((home (make-vfs-directory))
-	(work (make-vfs-directory)))
-    (%make-virtual-filesystem
-     :root (make-vfs-directory :directories (list (cons "home" home)
-						  (cons "work" work))
-			       :files ())
-     :current work)))
+  (let ((fs (%make-virtual-filesystem
+	     :root (make-vfs-directory :directories (list (cons "home" (make-vfs-directory))
+							  (cons "work" (make-vfs-directory)))
+				       :files ()))))
+    (setf (vfs-current-path fs) (fs-path-from-string fs "/work/"))
+    fs))
 
 (defun divide (string char &key (include-middle nil) (from-end nil))
   (let ((pos (position char string :from-end from-end)))
@@ -189,7 +191,7 @@
 	  (vfsd-files parent))))
 
 (def-vfs-method fs-current-directory (fs)
-  (make-directory-path :host nil :device nil :path '(:absolute "work")))
+  (ui-path-path (make-ui-path :path (vfs-current-path fs) :filesystem fs)))
 
 (def-vfs-method fs-home-directory (fs)
   (make-directory-path :host nil :device nil :path '(:absolute "home")))
@@ -227,4 +229,12 @@
 	(fs-make-file fs path))
       (call-next-method)))
 
-;changing currect directory (cd)
+(defun vfs-cd (ui-path)
+  (unless (path-exists-p ui-path)
+    (error "Cannot cd to non-existing path ~a." ui-path))
+  (bind-ui-path (path fs) ui-path
+    (if (absolute-path-p ui-path)
+	(setf (vfs-current-path fs) path)
+	(setf (vfs-current-path fs) (ui-path-path (path+ (make-ui-path :path (vfs-current-path fs) :filesystem fs)
+							 ui-path))))))
+

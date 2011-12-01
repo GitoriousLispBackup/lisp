@@ -44,6 +44,12 @@
 	   remove-file
 	   remove-directory
 
+	   list-directory
+	   resolve-path
+
+	   home-directory
+	   current-directory
+
 	   file-lock-error
 	   file-lock-error-path
 	   wrong-filename-error

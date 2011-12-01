@@ -379,10 +379,91 @@
     (make-file subdir-file-path)
     (!condition-safe (remove-directory path t))))
 
-;;recursive delete directory with subdirectories
+(def-ui-test list-empty-directory
+  (!null (list-directory (path-from-string "/home/" :fs fs)))
+  (!null (list-directory (path-from-string "/work/" :fs fs))))
 
-;;list empty directory
-;;list directory with files
-;;list directory with files and subdirectories
-;;list big directory recursive
-;;list non-existing directory
+(def-ui-test list-directory-with-files
+  (let ((path (path-from-string "a.dir/" :fs fs))
+	(file1 (path-from-string "a.dir/file.1" :fs fs))
+	(file2 (path-from-string "a.dir/file.2" :fs fs)))
+    (make-directory path)
+    (make-file file1)
+    (make-file file2)
+    (!equalp (list-directory path) `(,file1 ,file2))))
+
+(def-ui-test list-directory-with-subdirs
+  (let ((path (path-from-string "a.dir/" :fs fs))
+	(file1 (path-from-string "a.dir/file.1" :fs fs))
+	(file2 (path-from-string "a.dir/file.2" :fs fs))
+	(dir1 (path-from-string "a.dir/dir.1/" :fs fs))
+	(dir2 (path-from-string "a.dir/dir.2/" :fs fs)))
+    (make-directory path)
+    (make-file file1)
+    (make-file file2)
+    (make-directory dir1)
+    (make-directory dir2)
+    (!equalp (list-directory path) (list dir1 dir2 file1 file2))))
+
+(def-ui-test list-big-directory 
+  (let ((path (path-from-string "a.dir/" :fs fs))
+	(file1 (path-from-string "a.dir/a.file" :fs fs))
+	(file2 (path-from-string "a.dir/b.file" :fs fs))
+	(dir1 (path-from-string "a.dir/a.dir/" :fs fs))
+	(dir2 (path-from-string "a.dir/b.dir/" :fs fs))
+	(subfile1 (path-from-string "a.dir/a.dir/sub.file" :fs fs))
+	(subfile2 (path-from-string "a.dir/b.dir/sub.file2" :fs fs)))
+    (make-directory path)
+    (make-file file1)
+    (make-file file2)
+    (make-directory dir1)
+    (make-directory dir2)
+    (make-file subfile1)
+    (make-file subfile2)
+    (!equalp (list-directory path t) (list file1 file2 subfile1 subfile2))))
+
+(def-ui-test list-non-existing-directory
+  (let ((path (path-from-string "a.dir/" :fs fs)))
+    (!condition (list-directory path) directory-does-not-exist-error
+		(directory-does-not-exist-error-path path))))
+
+(def-ui-test resolve-simple-path
+  (let ((path (path-from-string "a.file" :fs fs)))
+    (make-file path)
+    (!equalp (resolve-path path) (list path)))
+  (let ((path (path-from-string "a.dir/" :fs fs)))
+    (make-directory path)
+    (!equalp (resolve-path path) (list path))))
+
+(def-ui-test resolve-long-path
+  (let ((path (path-from-string "/a/very/long/path/to/this.file" :fs fs)))
+    (make-file path :recursive t)
+    (!equalp (resolve-path path) (list path))))
+
+(def-ui-test resolve-non-existing-path
+  (let ((path (path-from-string "a/non/existing/path/to/a.file" :fs fs)))
+    (!null (resolve-path path))))
+
+(def-ui-test resolve-wild-filenames
+  (let ((path1 (path-from-string "/a.dir/b.dir/a.file.extbla" :fs fs))
+	(path2 (path-from-string "/a.dir/b.dir/b.file.extmyetx" :fs fs))
+	(wild-path (path-from-string "/a.dir/b.dir/?.file.ext*" :fs fs)))
+    (make-file path1 :recursive t)
+    (make-file path2)
+    (!equalp (resolve-path wild-path) (list path1 path2))))
+
+(def-ui-test resolve-wild-pathes
+  (let ((path1 (path-from-string "a.dir/b.dir/c.dir/a.file.name" :fs fs))
+	(path2 (path-from-string "a.d.r/babr/c.dir/e.blabla.name" :fs fs))
+	(wild-path (path-from-string "a.d?r/b*r/c.dir/?.*.name" :fs fs)))
+    (make-file path1 :recursive t)
+    (make-file path2 :recursive t)
+    (!equalp (resolve-path wild-path) (list path2 path1))))
+
+(def-ui-test home-directory-test
+  (!path= (home-directory fs) (path-from-string "/home/" :fs fs)))
+
+(def-ui-test current-directory-test
+  (!path= (current-directory fs) (path-from-string "/work/" :fs fs)))
+
+;;file test

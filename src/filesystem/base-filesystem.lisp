@@ -116,5 +116,4 @@
       (if (check-existance)
 	  (fs-open-stream fs path direction element-type position)))))
 
-
   
