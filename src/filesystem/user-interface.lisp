@@ -185,6 +185,9 @@
   (ecase (first (path-path path))
     (:relative nil)
     (:absolute t)))
+
+(defun as-absolute-path (path)
+  (error "No implementation"));
 	   
 ;;
 ;; Making and deleting filesystem objects
