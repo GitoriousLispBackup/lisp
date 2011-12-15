@@ -8,12 +8,19 @@
   root
   current-path)
 
+(defmethod print-object ((object virtual-filesystem) stream)
+  (format stream "#S(VIRTUAL-FILESYSTEM :ROOT ~a :CURRENT-PATH ~a)" (vfs-root object) (vfs-current-path object)))
+
 (defun vfs-current (fs)
   (vfs-find-directory fs (directory-path (vfs-current-path fs))))
 
 (defstruct (vfs-directory (:conc-name vfsd-))
+  parent
   directories
   files)
+
+(defmethod print-object ((object vfs-directory) stream)
+  (format stream "#S(VFS-DIRECTORY :DIRECTORIES ~a :FILES ~a)" (vfsd-directories object) (vfsd-files object)))
 
 (defstruct (vfs-file (:conc-name vfsf-))
   (value (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character))
@@ -21,12 +28,14 @@
   (write-lock-p nil))
 
 (defun make-virtual-filesystem ()
-  (let ((fs (%make-virtual-filesystem
-	     :root (make-vfs-directory :directories (list (cons "home" (make-vfs-directory))
-							  (cons "work" (make-vfs-directory)))
-				       :files ()))))
-    (setf (vfs-current-path fs) (fs-path-from-string fs "/work/"))
-    fs))
+  (let ((home-dir (make-vfs-directory))
+	(work-dir (make-vfs-directory)))
+    (let ((root (make-vfs-directory :directories (list (cons "home" home-dir) (cons "work" work-dir)))))
+      (setf (vfsd-parent home-dir) root)
+      (setf (vfsd-parent work-dir) root)
+      (let ((fs (%make-virtual-filesystem :root root)))
+	(setf (vfs-current-path fs) (fs-path-from-string fs "/work/"))
+	fs))))
 
 (defun divide (string char &key (include-middle nil) (from-end nil))
   (let ((pos (position char string :from-end from-end)))
@@ -135,7 +144,10 @@
 (defun vfs-find-directory (fs path)
   (labels 
       ((do-find-subdirectory (dir name)
-	 (rest (assoc name (vfsd-directories dir) :test #'equal)))
+	 (cond 
+	   ((string= name ".") dir)
+	   ((string= name "..") (if (vfsd-parent dir) (vfsd-parent dir) dir))
+	   (t (rest (assoc name (vfsd-directories dir) :test #'equal)))))
        (do-find-directory (dir path)
 	 (cond 
 	   ((null dir) nil)
@@ -179,7 +191,7 @@
 
 (def-vfs-method fs-make-directory (fs path)
   (let ((parent (vfs-find-directory fs (butlast (directory-path path)))))
-    (push (cons (first (last (directory-path path))) (make-vfs-directory))
+    (push (cons (first (last (directory-path path))) (make-vfs-directory :parent parent))
 	  (vfsd-directories parent))))
 
 (defun find-file-directory (fs path)
@@ -232,9 +244,8 @@
 (defun vfs-cd (ui-path)
   (unless (path-exists-p ui-path)
     (error "Cannot cd to non-existing path ~a." ui-path))
-  (bind-ui-path (path fs) ui-path
-    (if (absolute-path-p ui-path)
-	(setf (vfs-current-path fs) path)
-	(setf (vfs-current-path fs) (ui-path-path (path+ (make-ui-path :path (vfs-current-path fs) :filesystem fs)
-							 ui-path))))))
+  (let ((ui-path (as-absolute-path ui-path)))
+    (bind-ui-path (path fs) ui-path
+      (setf (vfs-current-path fs) path))))
+
 

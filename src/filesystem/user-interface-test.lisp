@@ -69,12 +69,14 @@
 
 (def-ui-test file-path-exists-p-test
   (let ((path1 (path-from-string "a.file" :fs fs))
+	(path1-with-dots (path-from-string ".././././work/a.file" :fs fs))
 	(inner-path1 (fs-path-from-string fs "a.file"))
 	(path1-as-directory (path-from-string "a.file/" :fs fs))
 	(path2 (path-from-string "/work/a.file" :fs fs))
 	(path3 (path-from-string "/work/other.file" :fs fs)))
     (fs-make-file fs inner-path1)
     (!t (path-exists-p path1))
+    (!t (path-exists-p path1-with-dots))
     (!t (path-exists-p path2))
     (!not (path-exists-p path1-as-directory))
     (!not (path-exists-p path3))))
@@ -428,10 +430,10 @@
 		(directory-does-not-exist-error-path path))))
 
 (def-ui-test resolve-simple-path
-  (let ((path (path-from-string "a.file" :fs fs)))
+  (let ((path (path-from-string "/a.file" :fs fs)))
     (make-file path)
     (!equalp (resolve-path path) (list path)))
-  (let ((path (path-from-string "a.dir/" :fs fs)))
+  (let ((path (path-from-string "/a.dir/" :fs fs)))
     (make-directory path)
     (!equalp (resolve-path path) (list path))))
 
@@ -453,12 +455,24 @@
     (!equalp (resolve-path wild-path) (list path1 path2))))
 
 (def-ui-test resolve-wild-pathes
-  (let ((path1 (path-from-string "a.dir/b.dir/c.dir/a.file.name" :fs fs))
-	(path2 (path-from-string "a.d.r/babr/c.dir/e.blabla.name" :fs fs))
-	(wild-path (path-from-string "a.d?r/b*r/c.dir/?.*.name" :fs fs)))
+  (let ((path1 (path-from-string "/a.dir/b.dir/c.dir/a.file.name" :fs fs))
+	(path2 (path-from-string "/a.d.r/babr/c.dir/e.blabla.name" :fs fs))
+	(wild-path (path-from-string "/a.d?r/b*r/c.dir/?.*.name" :fs fs)))
     (make-file path1 :recursive t)
     (make-file path2 :recursive t)
     (!equalp (resolve-path wild-path) (list path2 path1))))
+
+(def-ui-test resolve-pathes-with-dots 
+  (let ((path (path-from-string "../work/" :fs fs)))
+    (!equalp (resolve-path path) (list (path-from-string "/work/" :fs fs)))))
+
+(defmacro !as-absolute= (path expected)
+  `(path-check ,path as-absolute-path ,expected))
+
+(def-ui-test as-absolute-path-test
+  (!as-absolute= "a.dir/other.dir/file.ext" "/work/a.dir/other.dir/file.ext")
+  (!as-absolute= "/dir/other.dir/etc" "/dir/other.dir/etc")
+  (!as-absolute= "a.dir/../other.dir/./dir/./file.ext" "/work/other.dir/dir/file.ext"))
 
 (def-ui-test home-directory-test
   (!path= (home-directory fs) (path-from-string "/home/" :fs fs)))
@@ -466,4 +480,10 @@
 (def-ui-test current-directory-test
   (!path= (current-directory fs) (path-from-string "/work/" :fs fs)))
 
-;;file test
+(def-ui-test with-file-test
+  (let ((path (path-from-string "a.file" :fs fs)))
+    (with-file (out path :direction :output)
+      (write-line "A test string" out))
+    (with-file (in path :direction :input)
+      (!equal (read-line in) "A test string"))))
+

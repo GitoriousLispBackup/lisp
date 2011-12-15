@@ -187,7 +187,25 @@
     (:absolute t)))
 
 (defun as-absolute-path (path)
-  (error "No implementation"));
+  (labels ((%absolute-path (path dir)
+	     (cond
+	       ((string= dir ".") path)
+	       ((string= dir "..") (butlast path))
+	       (t (append path (list dir)))))
+	   (%as-absolute-directory (path) 
+	     (let ((parent (parent-path path)))
+	       (if parent 
+		   (copy-path path 
+			      :new-path (%absolute-path (path-path (as-absolute-path parent))
+							(first (last (path-path path)))))
+		   path)))
+	   (%as-absolute-path (path)
+	     (path-cond path 
+			(copy-path path :new-directory (as-absolute-path (path-directory path)))
+			(%as-absolute-directory path))))
+    (if (relative-path-p path)
+	(as-absolute-path (path+ (current-directory (ui-path-filesystem path)) path))
+	(%as-absolute-path path))))
 	   
 ;;
 ;; Making and deleting filesystem objects
@@ -297,8 +315,8 @@
 
 (defun resolve-path (path)
   (path-cond path
-	     (%resolve-file-path path)
-	     (%resolve-directory-path path)))
+	     (%resolve-file-path (as-absolute-path path))
+	     (%resolve-directory-path (as-absolute-path path))))
 
 ;;
 ;; Standart directories
@@ -343,8 +361,7 @@
 				 ,@(if if-exists-p `(:if-exists ,if-exists))
 				 ,@(if if-does-not-exist-p `(:if-does-not-exist ,if-does-not-exist)))))
 	 (unwind-protect (progn ,@body)
-	   (bind-ui-path (path fs) ,path-sym
-	     (close-stream ,stream fs)))))))
+	   (close-stream ,stream (ui-path-filesystem ,path-sym)))))))
 
 
 

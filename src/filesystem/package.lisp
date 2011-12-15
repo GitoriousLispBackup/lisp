@@ -46,9 +46,14 @@
 
 	   list-directory
 	   resolve-path
+	   as-absolute-path
 
 	   home-directory
 	   current-directory
+
+	   open-file
+	   close-stream
+	   with-file
 
 	   file-lock-error
 	   file-lock-error-path

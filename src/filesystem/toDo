@@ -1,4 +1,3 @@
-Test remained functions.
 Add .. and . support.
 Add as-absolute-path function.
 make vfs interface.
