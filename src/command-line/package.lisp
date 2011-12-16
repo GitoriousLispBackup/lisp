@@ -2,6 +2,7 @@
   (:use #:common-lisp)
   (:export #:make-argument
 	   #:argument-description
+	   #:argument-short-name
 
 	   #:make-argument-list
 	   #:add-argument
@@ -9,10 +10,14 @@
 	   #:argument
 	   #:have-argument-p
 	   #:argument-set-p
+	   #:help-message
 
 	   #:argument-not-defined-error
 	   #:argument-not-defined-error-name
 	   
 	   #:argument-already-exists-error
-	   #:argument-already-exists-error-name))
+	   #:argument-already-exists-error-name
+
+	   #:short-name-already-exists-error
+	   #:short-name-already-exists-error-char))
 	   

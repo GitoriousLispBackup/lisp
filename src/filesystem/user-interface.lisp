@@ -18,7 +18,9 @@
 ;; Path/string conversion
 ;;
 
-(defun path-from-string (filename &key (type nil) (fs 'common-filesystem))
+(defvar *default-filesystem* 'common-filesystem)
+
+(defun path-from-string (filename &key (type nil) (fs *default-filesystem*))
   (let ((path (fs-path-from-string fs filename)))
     (flet ((check-path (path)
 	     (cond 
@@ -322,10 +324,10 @@
 ;; Standart directories
 ;;
 
-(defun home-directory (fs)
+(defun home-directory (&optional (fs *default-filesystem*))
   (make-ui-path :path (fs-home-directory fs) :filesystem fs))
 
-(defun current-directory (fs)
+(defun current-directory (&optional (fs *default-filesystem*))
   (make-ui-path :path (fs-current-directory fs) :filesystem fs))
 
 ;;
@@ -344,7 +346,7 @@
 		   (if if-exists-p `(:if-exists ,if-exists))
 		   (if if-does-not-exist-p `(:if-does-not-exist ,if-does-not-exist))))))
 
-(defun close-stream (stream &optional (fs 'common-filesystem))
+(defun close-stream (stream &optional (fs *default-filesystem*))
   (fs-close-stream fs stream))
 
 (defmacro with-file ((stream path &key 
