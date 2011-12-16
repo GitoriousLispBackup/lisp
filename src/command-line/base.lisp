@@ -7,10 +7,11 @@
 (defstruct (argument (:constructor %make-argument))
   name
   description
-  short-name)
+  short-name
+  type)
 
-(defun make-argument (name &key (description nil) (short nil))
-  (%make-argument :name name :description description :short-name short))
+(defun make-argument (name &key (description nil) (short nil) (type nil))
+  (%make-argument :name name :description description :short-name short :type type))
 
 ;;
 ;; Argument list structure
@@ -75,10 +76,15 @@
 	     (format nil "  [ARGS]~%~%"))
 	   (where-string ()
 	     (format nil "  Where ARGS are:~%"))
+	   (type-string (arg)
+	     (if (and (listp arg) (eq (first arg) 'list))
+		 " [ARG1 ...]"
+		 " ARG"))
 	   (name-string (arg)
 	     (concatenate 'string 
 			  (format nil "    --~a" (argument-name arg))
-			  (if (argument-short-name arg) (format nil ",-~a" (argument-short-name arg)) "")))
+			  (if (argument-short-name arg) (format nil ",-~a" (argument-short-name arg)) "")
+			  (if (argument-type arg) (type-string (argument-type arg)) "")))
 	   (description-string (arg)
 	     (argument-description arg))
 	   (describe-strings (args)

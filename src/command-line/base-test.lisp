@@ -95,3 +95,27 @@
 		    '("    --help" 13 "Products this help message")
 		    '("    --flag,-f" 10 "some flag")
 		    ""))))
+
+(deftest base-test key-help ()
+  (let ((args (make-argument-list 
+	       :arguments `(,(make-argument "key" :description "some key" :type 'integer)))))
+    (!equal (help-message args)
+	    (lines "Usage:"
+		   "  [ARGS]"
+		   ""
+		   "  Where ARGS are:"
+		   '("    --help" 13 "Products this help message")
+		   '("    --key ARG" 10 "some key")
+		   ""))))
+
+(deftest base-test list-key-help ()
+  (let ((args (make-argument-list
+	       :arguments `(,(make-argument "key" :description "some key" :type '(list integer))))))
+    (!equal (help-message args)
+	    (lines "Usage:"
+		   "  [ARGS]"
+		   ""
+		   "  Where ARGS are:"
+		   '("    --help" 20 "Products this help message")
+		   '("    --key [ARG1 ...]" 10 "some key")
+		   ""))))
