@@ -1,23 +1,29 @@
 (defpackage #:burning-command-line
   (:use #:common-lisp)
   (:export #:make-argument
+	   #:argument-name
 	   #:argument-description
 	   #:argument-short-name
 
-	   #:make-argument-list
+	   #:make-arguments-spec
 	   #:add-argument
 	   #:add-arguments
 	   #:argument
 	   #:have-argument-p
-	   #:argument-set-p
 	   #:help-message
-
-	   #:argument-not-defined-error
-	   #:argument-not-defined-error-name
+	   #:parse-arguments
 	   
+	   #:argument-set-p
+
 	   #:argument-already-exists-error
 	   #:argument-already-exists-error-name
 
 	   #:short-name-already-exists-error
-	   #:short-name-already-exists-error-char))
+	   #:short-name-already-exists-error-char
+
+	   #:wrong-argument-error
+	   #:wrong-argument-error-string
+
+	   #:wrong-short-argument-error
+	   #:wrong-short-argument-error-char))
 	   
