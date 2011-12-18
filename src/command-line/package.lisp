@@ -14,6 +14,7 @@
 	   #:parse-arguments
 	   
 	   #:argument-set-p
+	   #:argument-value
 
 	   #:argument-already-exists-error
 	   #:argument-already-exists-error-name
@@ -25,5 +26,12 @@
 	   #:wrong-argument-error-string
 
 	   #:wrong-short-argument-error
-	   #:wrong-short-argument-error-char))
+	   #:wrong-short-argument-error-char
+
+	   #:wrong-key-value-error
+	   #:wrong-key-value-error-value
+	   #:wrong-key-value-error-type
+
+	   #:missed-key-value-error
+	   #:missed-key-value-error-type))
 	   

@@ -97,7 +97,10 @@
   (let ((spec (make-arguments-spec ("" :no-help))))
     (!null (have-argument-p "help" spec))))
 
-;;Help flag parsing
+(deftest base-test help-flag-parsing ()
+  (let ((spec (make-arguments-spec)))
+    (let ((args (parse-arguments '("--help") spec)))
+      (!t (argument-set-p "help" args)))))
 
 ;; Short names test
 
@@ -134,11 +137,80 @@
       (!t (argument-set-p "f3" args))
       (!null (argument-set-p "f2" args)))))
 
-;;Simple key
-;;Wrong value for key
-;;Missed key value
-;;List key
-;;Flag after vector
+(deftest base-test print-short-names ()
+  (let ((spec (make-arguments-spec "" (:flag "flag" :short-name #\f :description "some flag"))))
+    (!equalp (help-message spec)
+	     (lines "Usage:"
+		    "   [ARGS]"
+		    ""
+		    "  Where ARGS are:"
+		    '("    --help" 13 "Products this help message")
+		    '("    --flag,-f" 10 "some flag")
+		    ""))))
+
+;;
+;; Key tests
+;;
+
+(deftest base-test simple-key-test ()
+  (let ((spec (make-arguments-spec "" (:key "key" :type 'integer :description "some key"))))
+    (!t (have-argument-p "key" spec))
+    (let ((args (parse-arguments '("--key" "123") spec)))
+      (!t (argument-set-p "key" args))
+      (!= (argument-value "key" args) 123))))
+
+(deftest base-test wrong-value-for-key ()
+  (let ((spec (make-arguments-spec "" (:key "key" :type 'integer))))
+    (!condition (parse-arguments '("--key" "blabla") spec)
+		wrong-key-value-error
+		(wrong-key-value-error-value "123")
+		(wrong-key-value-error-type 'integer))))
+
+(deftest base-test missed-key-value-test ()
+  (let ((spec (make-arguments-spec "" (:key "key" :type 'integer))))
+    (!condition (parse-arguments '("--key") spec)
+		missed-key-value-error
+		(missed-key-value-error-type 'integer))
+    (!condition (parse-arguments '("--key" "--key") spec)
+		missed-key-value-error
+		(missed-key-value-error-type 'integer))))
+
+(deftest base-test key-help ()
+  (let ((spec (make-arguments-spec "Spec" (:key "key" :type 'integer :short-name #\k :description "some key"))))
+    (!equal (help-message spec)
+	    (lines "Usage:"
+		   "  Spec [ARGS]"
+		   ""
+		   "  Where ARGS are:"
+		   '("    --help" 20 "Products this help message")
+		   '("    --key,-k INTEGER" 10 "some key")
+		   ""))))
+
+(deftest base-test list-key-test ()
+  (let ((spec (make-arguments-spec "" (:key "key" :type '(list integer)))))
+    (let ((args (parse-arguments '("--key" "123" "456" "789") spec)))
+      (!t (argument-set-p "key" args))
+      (!equal (argument-value "key" args) '(123 456 789)))))
+
+(deftest base-test key-after-list-test ()
+  (let ((spec (make-arguments-spec "" (:key "key" :type '(list integer)) (:key "key2" :type 'string))))
+    (let ((args (parse-arguments '("--key" "123" "456" "--key2" "blabla") spec)))
+      (!t (argument-set-p "key" args))
+      (!t (argument-set-p "key2" args))
+      (!equal (argument-value "key" args) '(123 456))
+      (!equal (argument-value "key2" args) "blabla"))))
+
+(deftest base-test list-key-help ()
+  (let ((args (make-arguments-spec "SP" (:key "key" :type '(list integer) :description "some key"))))
+    (!equal (help-message args)
+	    (lines "Usage:"
+		   "  SP [ARGS]"
+		   ""
+		   "  Where ARGS are:"
+		   '("    --help" 23 "Products this help message")
+		   '("    --key [INTEGER ...]" 10 "some key")
+		   ""))))
+
 ;;Parsing action's arguments
 ;;Argument for non-set action
 ;;Subactions same arguments
@@ -151,42 +223,6 @@
 ;;Groups
 
 #|
-
-(deftest base-test print-short-names ()
-  (let ((args (make-argument-list :arguments `(,(make-argument "flag" :short #\f :description "some flag")))))
-    (!equalp (help-message args)
-	     (lines "Usage:"
-		    "  [ARGS]"
-		    ""
-		    "  Where ARGS are:"
-		    '("    --help" 13 "Products this help message")
-		    '("    --flag,-f" 10 "some flag")
-		    ""))))
-
-(deftest base-test key-help ()
-  (let ((args (make-argument-list 
-	       :arguments `(,(make-argument "key" :description "some key" :type 'integer)))))
-    (!equal (help-message args)
-	    (lines "Usage:"
-		   "  [ARGS]"
-		   ""
-		   "  Where ARGS are:"
-		   '("    --help" 13 "Products this help message")
-		   '("    --key ARG" 10 "some key")
-		   ""))))
-
-(deftest base-test list-key-help ()
-  (let ((args (make-argument-list
-	       :arguments `(,(make-argument "key" :description "some key" :type '(list integer))))))
-    (!equal (help-message args)
-	    (lines "Usage:"
-		   "  [ARGS]"
-		   ""
-		   "  Where ARGS are:"
-		   '("    --help" 20 "Products this help message")
-		   '("    --key [ARG1 ...]" 10 "some key")
-		   ""))))
-
 (deftest base-test positionals-insert ()
   (let ((args (make-argument-list 
 

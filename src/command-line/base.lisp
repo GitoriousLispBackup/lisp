@@ -24,6 +24,21 @@
 		 :description description))
 
 ;;
+;; Key class
+;;
+
+(defclass key (argument) 
+  ((type :initarg :type :reader key-argument-type)))
+
+(defmethod make-argument ((class (eql :key)) name &key type short-name description)
+  (make-instance 'key
+		 :name name
+		 :type type
+		 :short-name short-name
+		 :description description))
+
+
+;;
 ;; Arguments specification
 ;;
 
@@ -63,7 +78,7 @@
       (make-instance 'arguments-spec :name name 
 		     :arguments arguments))))
 
-(defmacro make-arguments-spec (name-and-options &body argument-specs)
+(defmacro make-arguments-spec (&optional (name-and-options "") &body argument-specs)
   (labels ((parse-option (spec)
 	     (let ((name (if (listp spec) (first spec) spec)))
 	       (ecase name
@@ -93,12 +108,22 @@
 (defun help-message (list)
   (labels ((usage-message (list)
 	     (string+ (format nil "Usage:~%  ~a [ARGS]~%~%" (arguments-list-name list))))
-	   (argument-message (arg)
-	     (format nil "    --~a          ~a~%" (argument-name arg) (argument-description arg)))
+	   (argument-name-message (arg)
+	     (string+ (format nil "    --~a" (argument-name arg))
+		      (if (argument-short-name arg) (format nil ",-~a" (argument-short-name arg)) "")
+		      (if (typep arg 'key) (format nil " ~a" (type-value-name (key-argument-type arg))) "")))
+	   (argument-description-message (arg)
+	     (format nil "~a" (argument-description arg)))
 	   (arguments-message (list)
-	     (string+ (format nil "  Where ARGS are:~%")
-		      (apply #'string+ (mapcar #'argument-message (arguments-list-arguments list)))
-		      (format nil "~%"))))
+	     (let ((names (mapcar #'argument-name-message (arguments-list-arguments list)))
+		   (descs (mapcar #'argument-description-message (arguments-list-arguments list))))
+	       (let ((space (+ 10 (apply #'max (mapcar #'length names)))))
+		 (string+ (format nil "  Where ARGS are:~%")
+			  (apply #'string+ 
+				 (mapcar #'(lambda (name desc) 
+					     (format nil "~a~va~a~%" name (- space (length name)) "" desc))
+					 names descs))
+			  (format nil "~%"))))))
     (string+ (usage-message list)
 	     (arguments-message list))))
 
@@ -120,9 +145,25 @@
 	     (t `((:param ,arg))))))
     (apply #'append (mapcar #'argument-to-list args))))
 
-(defun parse-argument (value rest spec)
+(defgeneric parse-argument (arg rest-args))
+
+(defmethod parse-argument ((arg flag) rest)
+  (values arg rest))
+
+(define-condition missed-key-value-error (error)
+  ((type :initarg :type :reader missed-key-value-error-type)))
+
+(defmethod parse-argument ((arg key) rest)
+  (let ((type-spec (key-argument-type arg)))
+    (multiple-value-bind (type type-args) (if (listp type-spec) 
+					      (values (first type-spec) (rest type-spec))
+					      (values type-spec nil))
+      (apply #'parse-type rest type type-args))))
+
+(defun %parse-argument (value rest spec)
   (flet ((do-parse-argument (arg)
-	   (values (cons arg t) rest))
+	   (multiple-value-bind (value list) (parse-argument arg rest)
+	     (values (cons arg value) list)))
 	 (argument-by-short-name (name spec)
 	   (find name (arguments-list-arguments spec) :key #'argument-short-name))) 
     (ecase (first value)
@@ -144,10 +185,17 @@
 (defun parse-arguments (args spec)
   (labels ((do-parse-arguments (list)
 	     (null-cond list nil
-	       (multiple-value-bind (arg rest) (parse-argument (first list) (rest list) spec)
+	       (multiple-value-bind (arg rest) (%parse-argument (first list) (rest list) spec)
 		 (cons arg (do-parse-arguments rest))))))
     (do-parse-arguments (arguments-to-list args))))
 
+(defun find-argument (name list)
+  (find name list :test #'equal :key #'(lambda (arg) (argument-name (first arg)))))
+
 (defun argument-set-p (name args-list)
-  (if (find name args-list :test #'equal :key #'(lambda (arg) (argument-name (first arg)))) t nil))
+  (if (find-argument name args-list)  t nil))
       
+(defun argument-value (name args-list)
+  (let ((arg (find-argument name args-list)))
+    (if arg (values (rest arg) t) (values nil nil))))
+	

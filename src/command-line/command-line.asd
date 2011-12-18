@@ -7,4 +7,5 @@
   :licence "GPL v3"
   :serial t
   :components ((:file "package")
+	       (:file "types")
 	       (:file "base")))
