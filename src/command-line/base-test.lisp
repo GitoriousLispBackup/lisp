@@ -211,6 +211,38 @@
 		   '("    --key [INTEGER ...]" 10 "some key")
 		   ""))))
 
+(deftest base-test action-argument-test ()
+  (let ((spec (make-arguments-spec "Spec" (:action "act" :arguments ((:flag "flag"))))))
+    (!t (have-argument-p "act" spec))
+    (!t (have-argument-p "flag" spec))))
+
+(deftest base-test action-help-test ()
+  (let ((spec (make-arguments-spec "Spec" (:action "act" :short-name #\a
+						   :description "destructs universe"
+						   :arguments ((:flag "flag"))))))
+    (!equal (help-message (argument "act" spec))
+	    (lines "destructs universe"
+		   ""
+		   "Usage:"
+		   "  Spec --act,-a [ARGS]"
+		   ""
+		   "  Where ARGS are:"
+		   '("    --help" 10 "Products this help message")
+		   '("    --flag" 10 "")
+		   ""))))
+
+(deftest base-test spec-with-description-help ()
+  (let ((spec (make-arguments-spec ("spec" :description "destructs universe"))))
+    (!equal (help-message spec)
+	    (lines "destructs universe"
+		   ""
+		   "Usage:"
+		   "  spec [ARGS]"
+		   ""
+		   "  Where ARGS are:"
+		   '("    --help" 10 "Products this help message")
+		   ""))))
+
 ;;Parsing action's arguments
 ;;Argument for non-set action
 ;;Subactions same arguments
