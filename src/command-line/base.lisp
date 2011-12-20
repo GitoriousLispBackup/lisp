@@ -72,7 +72,6 @@
 (defun argument (name list)
   (find name (arguments-list-arguments list) :test #'equal :key #'argument-name))
 
-
 (defun have-argument-p (name list)
   (or (some  #'(lambda (action) (have-argument-p name action)) (actions list))
       (if (argument name list) t nil)))
@@ -220,37 +219,55 @@
 	     (t `((:param ,arg))))))
     (apply #'append (mapcar #'argument-to-list args))))
 
+(defstruct list-iterator
+  list)
+
+(defun iterator-current (iter)
+  (first (list-iterator-list iter)))
+
+(defun iterator-next (iter)
+  (setf (list-iterator-list iter) (rest (list-iterator-list iter))))
+
 (defgeneric parse-argument (arg rest-args))
 
-(defmethod parse-argument ((arg flag) rest)
-  (values arg rest))
+(defmethod parse-argument (arg rest)
+  nil)
 
 (define-condition missed-key-value-error (error)
   ((type :initarg :type :reader missed-key-value-error-type)))
 
 (defmethod parse-argument ((arg key) rest)
   (let ((type-spec (key-argument-type arg)))
-    (multiple-value-bind (type type-args) (if (listp type-spec) 
-					      (values (first type-spec) (rest type-spec))
-					      (values type-spec nil))
+    (destructuring-bind (type type-args) (if (listp type-spec) 
+					     (list (first type-spec) (rest type-spec))
+					     (list type-spec nil))
       (apply #'parse-type rest type type-args))))
 
-(defun %parse-argument (value rest spec)
-  (flet ((do-parse-argument (arg)
-	   (multiple-value-bind (value list) (parse-argument arg rest)
-	     (values (cons arg value) list)))
-	 (argument-by-short-name (name spec)
-	   (find name (arguments-list-arguments spec) :key #'argument-short-name))) 
-    (ecase (first value)
-      (:arg (let ((arg (argument (second value) spec)))
-	      (unless arg
-		(error 'wrong-argument-error :string (second value)))
-	      (do-parse-argument arg)))
-      (:short (let ((arg (argument-by-short-name (second value) spec)))
-		(unless arg
-		  (error 'wrong-short-argument-error :char (second value)))
-		(do-parse-argument arg)))
-      (:param (error 'wrong-argument-error :string (second value))))))
+(defun find-argument (name spec key)
+  (labels ((find-argument-in-actions (actions)
+	     (cond
+	       ((null actions) nil)
+	       ((find-argument name (first actions) key))
+	       (t (find-argument-in-actions (rest actions))))))
+    (or (find-argument-in-actions (actions spec))
+	(find name (arguments-list-arguments spec) :key key :test #'equal))))
+
+(defun %parse-argument (name key rest spec env)
+  (labels ((parse-in-actions (actions env)
+	     (cond 
+	       ((null actions) nil)
+	       ((and (argument-set-p (argument-name (first actions)) env)
+		     (find-argument name (first actions) key))
+		(setf (argument-value (argument-name (first actions)) env) 
+		      (%parse-argument name key rest (first actions) 
+				       (argument-value (argument-name (first actions)) env)))
+		env)
+	       (t (parse-in-actions (rest actions) env)))))
+    (or (parse-in-actions (actions spec) env)
+	(let ((arg (find name (arguments-list-arguments spec) :key key :test #'equal)))
+	  (if arg 
+	      (cons (cons arg (parse-argument arg rest)) env)
+	      nil)))))
 
 (defmacro null-cond (var null-value &body t-value)
   `(cond 
@@ -258,19 +275,34 @@
      (t ,@t-value)))
 
 (defun parse-arguments (args spec)
-  (labels ((do-parse-arguments (list)
-	     (null-cond list nil
-	       (multiple-value-bind (arg rest) (%parse-argument (first list) (rest list) spec)
-		 (cons arg (do-parse-arguments rest))))))
-    (do-parse-arguments (arguments-to-list args))))
+  (labels ((parse-cmd-argument (value)
+	     (ecase (first value)
+	       (:arg (list (second value) #'argument-name (make-condition 'wrong-argument-error 
+									:string (second value))))
+	       (:short (list (second value) #'argument-short-name (make-condition 'wrong-short-argument-error 
+										  :char (second value))))
+	       (:param (error 'wrong-argument-error :string (second value)))))
+	   (do-parse-arguments (iter &optional env)
+	     (null-cond (iterator-current iter) env
+	       (destructuring-bind (name key error) (parse-cmd-argument (iterator-current iter))
+		 (iterator-next iter)
+		 (let ((env (%parse-argument name key iter spec env)))
+		   (unless env
+		     (error error))
+		   (do-parse-arguments iter env))))))
+    (do-parse-arguments (make-list-iterator :list (arguments-to-list args)))))
 
-(defun find-argument (name list)
+(defun find-argument-in-list (name list)
   (find name list :test #'equal :key #'(lambda (arg) (argument-name (first arg)))))
 
 (defun argument-set-p (name args-list)
-  (if (find-argument name args-list)  t nil))
+  (if (find-argument-in-list name args-list)  t nil))
+
+(defun (setf argument-value) (value name args-list)
+  (let ((arg (find-argument-in-list name args-list)))
+    (if arg (setf (rest arg) value))))
       
 (defun argument-value (name args-list)
-  (let ((arg (find-argument name args-list)))
+  (let ((arg (find-argument-in-list name args-list)))
     (if arg (values (rest arg) t) (values nil nil))))
 	

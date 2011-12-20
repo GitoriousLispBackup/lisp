@@ -243,20 +243,38 @@
 		   '("    --help" 10 "Products this help message")
 		   ""))))
 
-;;Parsing action's arguments
-;;Argument for non-set action
-;;Subactions same arguments
-;;Parsing positionals
-;;Positionals in subaction
+(deftest base-test parsing-action-test ()
+  (let ((spec (make-arguments-spec ("spec") (:action "act" :arguments ((:flag "flag"))))))
+    (let ((args (parse-arguments '("--act" "--flag") spec)))
+      (!t (argument-set-p "act" args))
+      (!t (argument-set-p "flag" (argument-value "act" args))))))
 
+(deftest base-test argument-for-non-set-action ()
+  (let ((spec (make-arguments-spec "" (:action "act" :arguments ((:flag "flag"))))))
+    (!condition (parse-arguments '("--flag") spec)
+		wrong-argument-error
+		(wrong-argument-error-string "flag"))))
 
-;;Arguments with subarguments
-;;Action group
-;;Groups
+(deftest base-test parsing-subactions-test ()
+  (let ((spec (make-arguments-spec "" (:action "act" :arguments ((:action "act2"))))))
+    (let ((args (parse-arguments '("--act" "--act2") spec)))
+      (!t (argument-set-p "act" args))
+      (!null (argument-set-p "act2" args))
+      (!t (argument-set-p "act2" (argument-value "act" args))))))
 
-#|
-(deftest base-test positionals-insert ()
-  (let ((args (make-argument-list 
+(deftest base-test subactions-same-arguments ()
+  (let ((spec (make-arguments-spec "" (:flag "flag") (:action "act" :arguments ((:flag "flag"))))))
+    (let ((args (parse-arguments '("--act" "--flag") spec)))
+      (!null (argument-set-p "flag" args))
+      (!t (argument-set-p "act" args))
+      (!t (argument-set-p "flag" (argument-value "act" args))))))
 
-;;positional help
-|#
+;;Simple group
+;;Group with <= 1
+;;Group with >= 1
+;;Group with = 1
+;;Groups printing
+;;Actions default group
+
+;;Positionals
+

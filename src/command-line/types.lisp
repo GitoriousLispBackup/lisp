@@ -22,12 +22,14 @@
    (type :initarg :type :reader wrong-key-value-error-type)))
 
 (defmethod parse-type (value type &rest type-args)
-  (let ((arg (first value)))
+  (let ((arg (iterator-current value)))
     (assert (listp arg))
     (unless (eq (first arg) :param)
       (error 'missed-key-value-error :type (if type-args (cons type type-args) type)))
     (assert (eq (length arg) 2))
-    (handler-case (values (apply #'parse-type-value (second arg) type type-args) (rest value))
+    (handler-case (let ((result (apply #'parse-type-value (second arg) type type-args)))
+		    (iterator-next value)
+		    result)
       (error ()
 	(error 'wrong-key-value-error
 	       :value (second arg)
@@ -57,10 +59,8 @@
 
 (defmethod parse-type (value (type (eql 'list)) &rest type-args)
   (assert (= (length type-args) 1))
-  (if (parameter-p (first value))
-      (multiple-value-bind (result rest) (apply #'parse-type value type-args)
-	(multiple-value-bind (rest-result remain) (apply #'parse-type (rest value) type type-args)
-	  (values (cons result rest-result) remain)))
+  (if (parameter-p (iterator-current value))
+      (cons (apply #'parse-type value type-args) (apply #'parse-type value type type-args))
       (values nil value)))
 
   
