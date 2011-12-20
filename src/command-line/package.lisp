@@ -33,5 +33,9 @@
 	   #:wrong-key-value-error-type
 
 	   #:missed-key-value-error
-	   #:missed-key-value-error-type))
+	   #:missed-key-value-error-type
+
+	   #:too-much-arguments-in-group-set
+	   #:too-much-arguments-in-group-set-group
+	   #:too-much-arguments-in-group-set-arguments))
 	   

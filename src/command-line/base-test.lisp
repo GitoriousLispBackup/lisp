@@ -269,7 +269,22 @@
       (!t (argument-set-p "act" args))
       (!t (argument-set-p "flag" (argument-value "act" args))))))
 
-;;Simple group
+(deftest base-test simple-group ()
+  (let ((spec (make-arguments-spec "" (:group "group" :arguments ((:flag "flag1") (:flag "flag2"))))))
+    (let ((args (parse-arguments '("--flag2") spec)))
+      (!t (argument-set-p "flag2" args))
+      (!null (argument-set-p "flag1" args)))))
+
+(deftest base-test group-with-max-one ()
+  (let ((spec (make-arguments-spec "" (:group "group" :one-max :arguments ((:flag "f1") (:flag "f2"))))))
+    (!condition (parse-arguments '("--f1" "--f2") spec)
+		too-much-arguments-in-group-set
+		(too-much-arguments-in-group-set-group "group")
+		(too-much-arguments-in-group-set-arguments '("f1" "f2")))))
+
+;;Groups in action check
+;;Nested groups assert
+
 ;;Group with <= 1
 ;;Group with >= 1
 ;;Group with = 1

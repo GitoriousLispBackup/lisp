@@ -47,8 +47,14 @@
 ;;
 
 (defclass arguments-list () 
-  ((arguments :initarg :arguments :accessor arguments-list-arguments)
+  ((arguments :initarg :arguments :accessor %arguments-list-arguments)
    (parent :initform nil :reader arguments-list-parent)))
+
+(defun arguments-list-arguments (list)
+  (let ((args (%arguments-list-arguments list)))
+    (apply #'append
+	   (remove-if #'group-p args)
+	   (mapcar #'%arguments-list-arguments (remove-if-not #'group-p args)))))
 
 (defgeneric arguments-list-name (list))
 
@@ -67,7 +73,7 @@
 (defun add-argument (arg list)
   (when (have-argument-p (argument-name arg) list)
     (error 'argument-already-exists-error :name (argument-name arg)))
-  (push arg (arguments-list-arguments list)))
+  (push arg (%arguments-list-arguments list)))
 
 (defun argument (name list)
   (find name (arguments-list-arguments list) :test #'equal :key #'argument-name))
@@ -108,7 +114,7 @@
 (defmethod initialize-instance :after ((obj arguments-list) &key (help nil help-set-p) arguments)
   (let ((help (if help-set-p help (make-argument :flag "help" :description "Products this help message"))))
     (let ((arguments (if help (cons help arguments) arguments)))
-      (setf (arguments-list-arguments obj) arguments)))
+      (setf (%arguments-list-arguments obj) arguments)))
   (mapc #'(lambda (action) (setf (slot-value action 'parent) obj)) (actions obj)))
 
 (defmacro make-arguments-list (class name-and-options argument-specs)
@@ -143,21 +149,23 @@
   (defun parse-arguments-option (args)
     `(list ,@(mapcar #'(lambda (spec) (parse-argument-spec (first spec) (rest spec))) args))))
 
+(defun find-key (name list)
+  (cond
+    ((null list) nil)
+    ((eq (first list) name) (second list))
+    (t (find-key name (rest list)))))
+
+(defun remove-key (name list)
+  (cond
+    ((null list) nil)
+    ((eq (first list) name) (remove-key name (rest (rest list))))
+    (t (cons (first list) (remove-key name (rest list))))))
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defmethod parse-argument-spec ((class (eql :action)) spec)
-    (labels ((find-key (name list)
-	       (cond
-		 ((null list) nil)
-		 ((eq (first list) name) (second list))
-		 (t (find-key name (rest list)))))
-	     (remove-key (name list)
-	       (cond
-		 ((null list) nil)
-		 ((eq (first list) name) (remove-key name (rest (rest list))))
-		 (t (cons (first list) (remove-key name (rest list)))))))
-      (let ((args (find-key :arguments spec))
-	    (spec (remove-key :arguments spec)))
-	`(make-arguments-list 'action ,spec ,args)))))
+    (let ((args (find-key :arguments spec))
+	  (spec (remove-key :arguments spec)))
+      `(make-arguments-list 'action ,spec ,args))))
 
 (defmethod arguments-list-description ((list action))
   (argument-description list))
@@ -170,6 +178,36 @@
 
 (defun actions (arg-list)
   (remove-if-not #'(lambda (arg) (typep arg 'action)) (arguments-list-arguments arg-list)))
+
+(defun groups (arg-list)
+  (remove-if-not #'group-p (%arguments-list-arguments arg-list)))
+
+;;
+;; Group class
+;;
+
+(defclass group (arguments-list)
+  ((name :initarg :name :reader arguments-list-name)
+   (args-min :initarg :args-min :initform 0 :reader group-args-min)
+   (args-max :initarg :args-max :initform :infinity :reader group-args-max)))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defmethod parse-argument-spec ((class (eql :group)) spec)
+    (flet ((restriction-p (arg)
+	     (member arg '(:one-max :one-only :one-min)))
+	   (restriction-arg (arg)
+	     (ecase arg
+	       ((nil) nil)
+	       (:one-max '(:args-max 1)))))
+      (let ((args (find-key :arguments spec))
+	    (spec (remove-key :arguments spec)))
+	(let ((restrictions (remove-if-not #'restriction-p spec))
+	      (spec (remove-if #'restriction-p spec)))
+	  (when (> (length restrictions) 1) (error "Too much restrictions for group."))
+	  `(make-arguments-list 'group ,(append spec (restriction-arg (first restrictions))) ,args))))))
+
+(defun group-p (arg)
+  (typep arg 'group))
 
 ;;
 ;; Arguments specification
@@ -290,7 +328,29 @@
 		   (unless env
 		     (error error))
 		   (do-parse-arguments iter env))))))
-    (do-parse-arguments (make-list-iterator :list (arguments-to-list args)))))
+    (check-groups spec (do-parse-arguments (make-list-iterator :list (arguments-to-list args))))))
+
+(define-condition too-much-arguments-in-group-set (error)
+  ((group :initarg :group :reader too-much-arguments-in-group-set-group)
+   (arguments :initarg :arguments :reader too-much-arguments-in-group-set-arguments)))
+
+(defun check-groups (spec env)
+  (flet ((check-group (group)
+	   (unless (eq (group-args-max group) :infinity)
+	     (when (> (reduce #'+ (mapcar #'(lambda (arg) (if (argument-set-p (argument-name arg) env) 1 0))
+					  (arguments-list-arguments group)))
+		      (group-args-max group))
+	       (error 'too-much-arguments-in-group-set 
+		      :group (arguments-list-name group)
+		      :arguments (reduce #'append 
+					 (mapcar #'(lambda (arg) 
+						     (if (argument-set-p (argument-name arg) env) 
+							 `(,(argument-name arg)))) 
+						 (arguments-list-arguments group))))))))
+    (mapc #'check-group (groups spec))
+    (mapc #'check-groups (actions spec) (mapcar #'(lambda (action) (argument-value (argument-name action) env)) 
+						(actions spec)))
+    env))
 
 (defun find-argument-in-list (name list)
   (find name list :test #'equal :key #'(lambda (arg) (argument-name (first arg)))))
