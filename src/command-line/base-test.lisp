@@ -69,7 +69,7 @@
 (deftest base-test help-message-test ()
   (!equal (help-message (make-arguments-spec ""))
 	  (lines "Usage:"
-		 "   [ARGS]"
+		 "   [ARGS ...]"
 		 ""
 		 "  Where ARGS are:"
 		 '("    --help" 10 "Products this help message")
@@ -78,7 +78,7 @@
 (deftest base-test help-with-flag ()
   (!equal (help-message (make-arguments-spec "SPEC" (:flag "flag" :description "some flag")))
 	  (lines "Usage:"
-		 "  SPEC [ARGS]"
+		 "  SPEC [ARGS ...]"
 		 ""
 		 "  Where ARGS are:"
 		 '("    --help" 10 "Products this help message")
@@ -141,7 +141,7 @@
   (let ((spec (make-arguments-spec "" (:flag "flag" :short-name #\f :description "some flag"))))
     (!equalp (help-message spec)
 	     (lines "Usage:"
-		    "   [ARGS]"
+		    "   [ARGS ...]"
 		    ""
 		    "  Where ARGS are:"
 		    '("    --help" 13 "Products this help message")
@@ -179,7 +179,7 @@
   (let ((spec (make-arguments-spec "Spec" (:key "key" :type 'integer :short-name #\k :description "some key"))))
     (!equal (help-message spec)
 	    (lines "Usage:"
-		   "  Spec [ARGS]"
+		   "  Spec [ARGS ...]"
 		   ""
 		   "  Where ARGS are:"
 		   '("    --help" 20 "Products this help message")
@@ -204,7 +204,7 @@
   (let ((args (make-arguments-spec "SP" (:key "key" :type '(list integer) :description "some key"))))
     (!equal (help-message args)
 	    (lines "Usage:"
-		   "  SP [ARGS]"
+		   "  SP [ARGS ...]"
 		   ""
 		   "  Where ARGS are:"
 		   '("    --help" 23 "Products this help message")
@@ -224,7 +224,7 @@
 	    (lines "destructs universe"
 		   ""
 		   "Usage:"
-		   "  Spec --act,-a [ARGS]"
+		   "  Spec --act,-a [ARGS ...]"
 		   ""
 		   "  Where ARGS are:"
 		   '("    --help" 10 "Products this help message")
@@ -237,7 +237,7 @@
 	    (lines "destructs universe"
 		   ""
 		   "Usage:"
-		   "  spec [ARGS]"
+		   "  spec [ARGS ...]"
 		   ""
 		   "  Where ARGS are:"
 		   '("    --help" 10 "Products this help message")
@@ -282,14 +282,71 @@
 		(too-much-arguments-in-group-set-group "group")
 		(too-much-arguments-in-group-set-arguments '("f1" "f2")))))
 
-;;Groups in action check
-;;Nested groups assert
+(deftest base-test groups-in-action-check ()
+  (let ((spec (make-arguments-spec "" (:action "act" 
+					       :arguments ((:group "group" :one-max :arguments ((:flag "f1")
+												(:flag "f2"))))))))
+    (!condition (parse-arguments '("--act" "--f1" "--f2") spec)
+		too-much-arguments-in-group-set
+		(too-much-arguments-in-group-set-group "group")
+		(too-much-arguments-in-group-set-arguments '("f1" "f2")))))
 
-;;Group with <= 1
-;;Group with >= 1
-;;Group with = 1
-;;Groups printing
-;;Actions default group
+(deftest base-test nested-groups-error-test ()
+  (!error (make-arguments-spec "" (:group "g1" :arguments ((:group "g2"))))
+	  "Nested groups not allowed"))
+
+(deftest base-test groups-with-one-min ()
+  (let ((spec (make-arguments-spec "" (:group "g" :one-min :arguments ((:flag "f1"))))))
+    (!condition (parse-arguments () spec)
+		too-few-arguments-in-group-set
+		(too-few-arguments-in-group-set-group "g"))))
+								   
+(deftest base-test groups-with-one-only ()
+  (let ((spec (make-arguments-spec "" (:group "g" :one-only :arguments ((:flag "f1") (:flag "f2"))))))
+    (!condition (parse-arguments () spec)
+		too-few-arguments-in-group-set
+		(too-few-arguments-in-group-set-group "g"))
+    (!condition (parse-arguments '("--f1" "--f2") spec)
+		too-much-arguments-in-group-set
+		(too-much-arguments-in-group-set-group "g")
+		(too-much-arguments-in-group-set-arguments '("f1" "f2")))))
+
+(deftest base-test empty-spec-help ()
+  (!equal (help-message (make-arguments-spec ("Empty spec" :no-help)))
+	  (lines "Usage:"
+		 "  Empty spec"
+		 "")))
+
+(deftest base-test groups-printing ()
+  (let ((spec (make-arguments-spec "My spec" (:group "g1" :arguments ((:flag "f1" :description "flag1") 
+								      (:flag "f2" :description "flag2"))))))
+    (!equal (help-message spec)
+	    (lines "Usage:"
+		   "  My spec [ARGS ...] [g1 ...]"
+		   ""
+		   "  Where ARGS are:"
+		   '("    --help" 10 "Products this help message")
+		   ""
+		   "  Where g1 are:"
+		   '("    --f1" 10 "flag1")
+		   '("    --f2" 10 "flag2")
+		   ""))))
+
+(deftest base-test restricted-groups-printing ()
+  (let ((spec (make-arguments-spec ("My spec" :no-help)
+		(:group "g1" :one-max)
+		(:group "g2" :one-min)
+		(:group "g3" :one-only))))
+    (!equal (help-message spec)
+	    (lines "Usage:"
+		   "  My spec [g1] g2 [g2 ...] g3"
+		   ""
+		   "  Where g1 are:"
+		   ""
+		   "  Where g2 are:"
+		   ""
+		   "  Where g3 are:"
+		   ""))))
 
 ;;Positionals
 

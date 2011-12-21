@@ -47,7 +47,7 @@
 ;;
 
 (defclass arguments-list () 
-  ((arguments :initarg :arguments :accessor %arguments-list-arguments)
+  ((arguments :accessor %arguments-list-arguments)
    (parent :initform nil :reader arguments-list-parent)))
 
 (defun arguments-list-arguments (list)
@@ -58,17 +58,20 @@
 
 (defgeneric arguments-list-name (list))
 
-(defun check-arguments-list (args)
+(defun check-arguments-list (list)
   (labels ((have-same-names (args)
 	     (cond
 	       ((null args) nil)
 	       ((have-same-name (first args) (rest args)))
-	       (t (have-same-names (rest args))))))
-    (let ((duplicate (have-same-names args)))
+	       (t (have-same-names (rest args)))))
+	   (have-group (arg)
+	     (not (null (groups arg))))
+	   (have-nested-groups (args)
+	     (some #'have-group (remove-if-not #'group-p args))))
+    (let ((nested-groups (have-nested-groups (%arguments-list-arguments list))))
+      (if nested-groups (error "Nested groups not allowed")))
+    (let ((duplicate (have-same-names (arguments-list-arguments list))))
       (if duplicate (error duplicate) t))))
-
-(defmethod initialize-instance :before ((instance arguments-list) &key arguments)
-  (check-arguments-list arguments))
 
 (defun add-argument (arg list)
   (when (have-argument-p (argument-name arg) list)
@@ -88,10 +91,14 @@
 (defgeneric arguments-list-description (list))
 
 (defun help-message (list)
-  (labels ((usage-message (list)
+  (labels ((group-names (list)
+	     (let ((group-names (mapcar #'(lambda (group) (format nil "~a" (group-name group)))
+					(groups list))))
+	       (reduce #'string+ group-names)))
+	   (usage-message (list)
 	     (string+ (if (string/= (arguments-list-description list) "")
 			  (format nil "~a~%~%" (arguments-list-description list)) "")
-		      (format nil "Usage:~%  ~a [ARGS]~%~%" (arguments-list-name list))))
+		      (format nil "Usage:~%  ~a~a~%~%" (arguments-list-name list) (group-names list))))
 	   (argument-name-message (arg)
 	     (string+ (format nil "    --~a" (argument-name arg))
 		      (if (argument-short-name arg) (format nil ",-~a" (argument-short-name arg)) "")
@@ -99,23 +106,32 @@
 	   (argument-description-message (arg)
 	     (if (argument-description arg) (format nil "~a" (argument-description arg)) ""))
 	   (arguments-message (list)
-	     (let ((names (mapcar #'argument-name-message (arguments-list-arguments list)))
-		   (descs (mapcar #'argument-description-message (arguments-list-arguments list))))
-	       (let ((space (+ 10 (apply #'max (mapcar #'length names)))))
-		 (string+ (format nil "  Where ARGS are:~%")
-			  (apply #'string+ 
-				 (mapcar #'(lambda (name desc) 
-					     (format nil "~a~va~a~%" name (- space (length name)) "" desc))
-					 names descs))
-			  (format nil "~%"))))))
+	       (string+ (format nil "  Where ~a are:~%" (arguments-list-name list))
+			(if (> (length (arguments-list-arguments list)) 0)
+			    (let ((names (mapcar #'argument-name-message (arguments-list-arguments list)))
+				  (descs (mapcar #'argument-description-message (arguments-list-arguments list))))
+			      (let ((space (+ 10 (apply #'max (mapcar #'length names)))))
+				(apply #'string+ 
+				       (mapcar #'(lambda (name desc) 
+						   (format nil "~a~va~a~%" name (- space (length name)) "" desc))
+					       names descs))))
+			    "")
+			(format nil "~%"))))
     (string+ (usage-message list)
-	     (arguments-message list))))
+	     (reduce #'string+ (mapcar #'arguments-message (groups list))))))
 
 (defmethod initialize-instance :after ((obj arguments-list) &key (help nil help-set-p) arguments)
-  (let ((help (if help-set-p help (make-argument :flag "help" :description "Products this help message"))))
-    (let ((arguments (if help (cons help arguments) arguments)))
-      (setf (%arguments-list-arguments obj) arguments)))
-  (mapc #'(lambda (action) (setf (slot-value action 'parent) obj)) (actions obj)))
+  (let ((default-group-arguments (remove-if #'group-p arguments)))
+    (let ((help (if help-set-p help (make-argument :flag "help" :description "Products this help message"))))
+      (if help (push help default-group-arguments)))
+    (when (and (not (group-p obj)) (> (length default-group-arguments) 0))
+      (setf default-group-arguments `(,(make-instance 'group 
+						      :arguments default-group-arguments
+						      :name "ARGS"
+						      :help nil))))
+    (setf (%arguments-list-arguments obj) (append default-group-arguments (remove-if-not #'group-p arguments))))
+  (mapc #'(lambda (action) (setf (slot-value action 'parent) obj)) (actions obj))
+  (check-arguments-list obj))
 
 (defmacro make-arguments-list (class name-and-options argument-specs)
   (labels ((parse-option (spec)
@@ -191,6 +207,14 @@
    (args-min :initarg :args-min :initform 0 :reader group-args-min)
    (args-max :initarg :args-max :initform :infinity :reader group-args-max)))
 
+(defun group-name (group)
+  (let ((name (arguments-list-name group)))
+    (flet ((optional-name ()
+	     (format nil " [~a~@[ ...~]]" name (eq (group-args-max group) :infinity))))
+      (string+ (if (> (group-args-min group) 0) (format nil " ~a" name) "")
+	       (if (not (eq (group-args-min group) (group-args-max group)))
+		   (optional-name) "")))))
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defmethod parse-argument-spec ((class (eql :group)) spec)
     (flet ((restriction-p (arg)
@@ -198,13 +222,16 @@
 	   (restriction-arg (arg)
 	     (ecase arg
 	       ((nil) nil)
-	       (:one-max '(:args-max 1)))))
+	       (:one-max '(:args-max 1))
+	       (:one-min '(:args-min 1))
+	       (:one-only '(:args-min 1 :args-max 1)))))
       (let ((args (find-key :arguments spec))
 	    (spec (remove-key :arguments spec)))
 	(let ((restrictions (remove-if-not #'restriction-p spec))
 	      (spec (remove-if #'restriction-p spec)))
 	  (when (> (length restrictions) 1) (error "Too much restrictions for group."))
-	  `(make-arguments-list 'group ,(append spec (restriction-arg (first restrictions))) ,args))))))
+	  `(make-arguments-list 'group ,(append spec (restriction-arg (first restrictions)) '(:no-help))
+				,args))))))
 
 (defun group-p (arg)
   (typep arg 'group))
@@ -330,23 +357,25 @@
 		   (do-parse-arguments iter env))))))
     (check-groups spec (do-parse-arguments (make-list-iterator :list (arguments-to-list args))))))
 
+(define-condition too-few-arguments-in-group-set (error)
+  ((group :initarg :group :reader too-few-arguments-in-group-set-group)))
+
 (define-condition too-much-arguments-in-group-set (error)
   ((group :initarg :group :reader too-much-arguments-in-group-set-group)
    (arguments :initarg :arguments :reader too-much-arguments-in-group-set-arguments)))
 
 (defun check-groups (spec env)
   (flet ((check-group (group)
-	   (unless (eq (group-args-max group) :infinity)
-	     (when (> (reduce #'+ (mapcar #'(lambda (arg) (if (argument-set-p (argument-name arg) env) 1 0))
-					  (arguments-list-arguments group)))
-		      (group-args-max group))
-	       (error 'too-much-arguments-in-group-set 
-		      :group (arguments-list-name group)
-		      :arguments (reduce #'append 
-					 (mapcar #'(lambda (arg) 
-						     (if (argument-set-p (argument-name arg) env) 
-							 `(,(argument-name arg)))) 
-						 (arguments-list-arguments group))))))))
+	   (let ((set-arguments (remove-if-not #'(lambda (arg) (argument-set-p (argument-name arg) env))
+					       (arguments-list-arguments group))))
+	     (unless (eq (group-args-max group) :infinity)
+	       (when (> (length set-arguments) (group-args-max group))
+		 (error 'too-much-arguments-in-group-set 
+			:group (arguments-list-name group)
+			:arguments set-arguments)))
+	     (when (< (length set-arguments) (group-args-min group))
+	       (error 'too-few-arguments-in-group-set
+		      :group (arguments-list-name group))))))
     (mapc #'check-group (groups spec))
     (mapc #'check-groups (actions spec) (mapcar #'(lambda (action) (argument-value (argument-name action) env)) 
 						(actions spec)))
