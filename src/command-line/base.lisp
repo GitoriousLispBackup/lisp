@@ -51,8 +51,10 @@
   ((arguments :accessor %arguments-list-arguments)
    (parent :initform nil :reader arguments-list-parent)))
 
-(defun arguments-list-arguments (list)
+(defun arguments-list-arguments (list &key (include-positionals t))
   (let ((args (%arguments-list-arguments list)))
+    (unless include-positionals
+      (setf args (remove-if #'positional-group-p args)))
     (apply #'append
 	   (remove-if #'group-p args)
 	   (mapcar #'%arguments-list-arguments (remove-if-not #'group-p args)))))
@@ -65,7 +67,7 @@
 	       ((null args) nil)
 	       ((have-same-name (first args) (rest args)))
 	       (t (have-same-names (rest args))))))
-    (let ((duplicate (have-same-names (arguments-list-arguments list))))
+    (let ((duplicate (have-same-names (arguments-list-arguments list :include-positionals nil))))
       (if duplicate (error duplicate) t))))
 
 (defun add-argument (arg list)
@@ -261,9 +263,12 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defmethod parse-argument-spec ((class (eql :positional)) spec)
-    `(make-arguments-list 'positional (,(first spec) :no-help :args-min 1 :args-max 1)
-			  ((:key ,@spec)))))
-
+    (when (member :short-name spec)
+      (error "Positional arguments can't have short names"))
+    (let ((optional-p (member :optional spec))
+	  (spec (remove :optional spec)))
+      `(make-arguments-list 'positional (,(first spec) :no-help :args-min ,(if optional-p 0 1) :args-max 1)
+			    ((:key ,@spec))))))
 ;;
 ;; Arguments specification
 ;;

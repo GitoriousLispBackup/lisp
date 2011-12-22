@@ -389,12 +389,28 @@
 		   '("    --help" 10 "Products this help message")
 		   ""))))
 		     
+(deftest base-test positional-short-name-error ()
+  (!error (macroexpand '(make-arguments-spec "" (:positional "arg" :short-name #\a)))
+	  "Positional arguments can't have short names"))
 
+(deftest base-test positonal-name-eq-common-name-test ()
+  (!condition-safe (make-arguments-spec "" (:positional "arg") (:flag "arg"))))
 
-;;positional short-name assert
-;;positional name same as common name
+(deftest base-test optional-positional-test ()
+  (let ((spec (make-arguments-spec "" (:positional "p1" :type 'integer)
+				   (:positional "p2" :type 'integer :optional))))
+    (let ((args (parse-arguments '("123") spec)))
+      (!= (argument-value "p1" args) 123)
+      (!not (argument-set-p "p2" args)))))
 
-;;optional positionals
-;;optional positionals help
+(deftest base-test optional-positinals-help ()
+  (let ((spec (make-arguments-spec ("" :no-help) (:positional "p" :optional))))
+    (!equal (help-message spec)
+	    (lines "Usage:"
+		   "   [p]"
+		   ""
+		   '("  Where p is" 10 "")
+		   ""))))
+
 
 
