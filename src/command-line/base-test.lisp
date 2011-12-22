@@ -269,6 +269,12 @@
       (!t (argument-set-p "act" args))
       (!t (argument-set-p "flag" (argument-value "act" args))))))
 
+(deftest base-test arguments-for-non-set-subactoin ()
+  (let ((spec (make-arguments-spec "" (:action "a1" :arguments ((:action "a2" :arguments ((:flag "f"))))))))
+    (!condition (parse-arguments '("--a1" "--f") spec)
+		wrong-argument-error
+		(wrong-argument-error-string "f"))))
+
 (deftest base-test simple-group ()
   (let ((spec (make-arguments-spec "" (:group "group" :arguments ((:flag "flag1") (:flag "flag2"))))))
     (let ((args (parse-arguments '("--flag2") spec)))
@@ -348,5 +354,47 @@
 		   "  Where g3 are:"
 		   ""))))
 
-;;Positionals
+(deftest base-test group-name-same-as-arguments ()
+  (!condition-safe (make-arguments-spec "" (:group "arg" :arguments ((:flag "arg"))))))
+
+(deftest base-test defining-positional ()
+  (let ((spec (make-arguments-spec "" (:positional "key" :type 'integer))))
+    (!t (have-argument-p "key" spec))))
+
+(deftest base-test parsing-positionals ()
+  (let ((spec (make-arguments-spec "" (:positional "key" :type 'integer ))))
+    (let ((args (parse-arguments '("123") spec)))
+      (!t (argument-set-p "key" args))
+      (!= (argument-value "key" args) 123))))
+
+(deftest base-test positionals-order-test ()
+  (let ((spec (make-arguments-spec "" (:positional "key1" :type 'integer) 
+				   (:positional "key2" :type 'integer))))
+    (let ((args (parse-arguments '("123" "456") spec)))
+      (!= (argument-value "key1" args) 123)
+      (!= (argument-value "key2" args) 456))))
+
+(deftest base-test positonal-help-test ()
+  (let ((spec (make-arguments-spec "" (:positional "key" :description "a number of universe")
+				   (:positional "key2" :description "REAL number of universe"))))
+    (!equal (help-message spec)
+	    (lines "Usage:"
+		   "   [ARGS ...] key key2"
+		   ""
+		   '("  Where key is" 10 "a number of universe")
+		   ""
+		   '("  Where key2 is" 10 "REAL number of universe")
+		   ""
+		   "  Where ARGS are:"
+		   '("    --help" 10 "Products this help message")
+		   ""))))
+		     
+
+
+;;positional short-name assert
+;;positional name same as common name
+
+;;optional positionals
+;;optional positionals help
+
 

@@ -7,7 +7,8 @@
 (defclass argument ()
   ((name :initarg :name :reader argument-name)
    (short-name :initarg :short-name :reader argument-short-name)
-   (description :initarg :description :reader argument-description)))
+   (description :initarg :description :reader argument-description)
+   (group :initarg :group :reader argument-group)))
 
 (defgeneric make-argument (class name &key short-name description &allow-other-keys))
 
@@ -63,13 +64,7 @@
 	     (cond
 	       ((null args) nil)
 	       ((have-same-name (first args) (rest args)))
-	       (t (have-same-names (rest args)))))
-	   (have-group (arg)
-	     (not (null (groups arg))))
-	   (have-nested-groups (args)
-	     (some #'have-group (remove-if-not #'group-p args))))
-    (let ((nested-groups (have-nested-groups (%arguments-list-arguments list))))
-      (if nested-groups (error "Nested groups not allowed")))
+	       (t (have-same-names (rest args))))))
     (let ((duplicate (have-same-names (arguments-list-arguments list))))
       (if duplicate (error duplicate) t))))
 
@@ -105,6 +100,10 @@
 		      (if (typep arg 'key) (format nil " ~a" (type-value-name (key-argument-type arg))) "")))
 	   (argument-description-message (arg)
 	     (if (argument-description arg) (format nil "~a" (argument-description arg)) ""))
+	   (positional-message (arg)
+	     (assert (= (length (arguments-list-arguments arg)) 1))
+	     (format nil "  Where ~a is~va~a~%~%" (arguments-list-name arg) 10 "" 
+		     (argument-description-message (first (arguments-list-arguments arg)))))
 	   (arguments-message (list)
 	       (string+ (format nil "  Where ~a are:~%" (arguments-list-name list))
 			(if (> (length (arguments-list-arguments list)) 0)
@@ -118,7 +117,8 @@
 			    "")
 			(format nil "~%"))))
     (string+ (usage-message list)
-	     (reduce #'string+ (mapcar #'arguments-message (groups list))))))
+	     (reduce #'string+ (mapcar #'positional-message (remove-if-not #'positional-group-p (groups list))))
+	     (reduce #'string+ (mapcar #'arguments-message (remove-if #'positional-group-p (groups list)))))))
 
 (defmethod initialize-instance :after ((obj arguments-list) &key (help nil help-set-p) arguments)
   (let ((default-group-arguments (remove-if #'group-p arguments)))
@@ -207,6 +207,11 @@
    (args-min :initarg :args-min :initform 0 :reader group-args-min)
    (args-max :initarg :args-max :initform :infinity :reader group-args-max)))
 
+(defmethod initialize-instance :after ((obj group) &key)
+  (when (not (null (groups obj)))
+    (error "Nested groups not allowed"))
+  (mapc #'(lambda (arg) (setf (slot-value arg 'group) obj)) (%arguments-list-arguments obj)))
+
 (defun group-name (group)
   (let ((name (arguments-list-name group)))
     (flet ((optional-name ()
@@ -235,6 +240,29 @@
 
 (defun group-p (arg)
   (typep arg 'group))
+
+;;
+;; Positionals
+;;
+
+(defclass positional (group) ())
+
+(defun positional-p (arg)
+  (typep (argument-group arg) 'positional))
+
+(defun positional-group-p (group)
+  (typep group 'positional))
+
+(defmethod initialize-instance :after ((obj positional) &key)
+  (unless (= (length (arguments-list-arguments obj)) 1)
+    (error "Positional argument's group must have 1 argument"))
+  (unless (every #'(lambda (arg) (typep arg 'key)) (arguments-list-arguments obj))
+    (error "Positional argument must be a key")))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defmethod parse-argument-spec ((class (eql :positional)) spec)
+    `(make-arguments-list 'positional (,(first spec) :no-help :args-min 1 :args-max 1)
+			  ((:key ,@spec)))))
 
 ;;
 ;; Arguments specification
@@ -308,31 +336,24 @@
 					     (list type-spec nil))
       (apply #'parse-type rest type type-args))))
 
-(defun find-argument (name spec key)
-  (labels ((find-argument-in-actions (actions)
-	     (cond
-	       ((null actions) nil)
-	       ((find-argument name (first actions) key))
-	       (t (find-argument-in-actions (rest actions))))))
-    (or (find-argument-in-actions (actions spec))
-	(find name (arguments-list-arguments spec) :key key :test #'equal))))
+(defmacro aif (if-clause then-form &optional else-form)
+  `(let ((it ,if-clause))
+     (if it ,then-form ,else-form)))
 
-(defun %parse-argument (name key rest spec env)
-  (labels ((parse-in-actions (actions env)
-	     (cond 
-	       ((null actions) nil)
-	       ((and (argument-set-p (argument-name (first actions)) env)
-		     (find-argument name (first actions) key))
-		(setf (argument-value (argument-name (first actions)) env) 
-		      (%parse-argument name key rest (first actions) 
-				       (argument-value (argument-name (first actions)) env)))
-		env)
-	       (t (parse-in-actions (rest actions) env)))))
-    (or (parse-in-actions (actions spec) env)
-	(let ((arg (find name (arguments-list-arguments spec) :key key :test #'equal)))
-	  (if arg 
-	      (cons (cons arg (parse-argument arg rest)) env)
-	      nil)))))
+(defun %find-argument (spec test env &optional (recursive-p t))
+  (or (and recursive-p (find-if #'(lambda (action) (%find-argument action test env)) (actions spec)))
+      (find-if #'(lambda (arg) (funcall test arg (argument-set-p (argument-name arg) env))) 
+	       (arguments-list-arguments spec))))
+
+(defun %parse-argument (test rest spec env)
+  (labels ((parse-in-action (action env)
+	     (aif (and (argument-set-p (argument-name action) env)
+		       (%parse-argument test rest action (argument-value (argument-name action) env)))
+		  (setf (argument-value (argument-name action) env) it))))
+    (if (find-if #'(lambda (action) (parse-in-action action env)) (actions spec))
+	env
+	(aif (%find-argument spec test env nil)
+	     (cons (cons it (parse-argument it rest)) env)))))
 
 (defmacro null-cond (var null-value &body t-value)
   `(cond 
@@ -340,21 +361,33 @@
      (t ,@t-value)))
 
 (defun parse-arguments (args spec)
-  (labels ((parse-cmd-argument (value)
-	     (ecase (first value)
-	       (:arg (list (second value) #'argument-name (make-condition 'wrong-argument-error 
-									:string (second value))))
-	       (:short (list (second value) #'argument-short-name (make-condition 'wrong-short-argument-error 
-										  :char (second value))))
-	       (:param (error 'wrong-argument-error :string (second value)))))
+  (labels ((parse-positional (iter spec env)
+	     (%parse-argument (positional-test) iter spec env))
+	   (parse-argument (test iter spec env)
+	     (iterator-next iter)
+	     (%parse-argument test iter spec env))
+	   (argument-name-test (name key)
+	     (lambda (arg set-p)
+	       (declare (ignore set-p))
+	       (equal (funcall key arg) name)))
+	   (positional-test ()
+	     (lambda (arg set-p)
+	       (and (not set-p) (positional-p arg))))
+	   (parse-cmd-argument (args env)
+	     (let ((value (iterator-current args)))
+	       (ecase (first value)
+		 (:arg (aif (parse-argument (argument-name-test (second value) #'argument-name)
+					    args spec env)
+			    it (error 'wrong-argument-error :string (second value))))
+		 (:short (aif (parse-argument (argument-name-test (second value) #'argument-short-name)
+					      args spec env)
+			      it (error 'wrong-short-argument-error :char (second value))))
+		 (:param (aif (parse-positional args spec env)
+			      it (error 'wrong-argument-error :string (second value)))))))
 	   (do-parse-arguments (iter &optional env)
 	     (null-cond (iterator-current iter) env
-	       (destructuring-bind (name key error) (parse-cmd-argument (iterator-current iter))
-		 (iterator-next iter)
-		 (let ((env (%parse-argument name key iter spec env)))
-		   (unless env
-		     (error error))
-		   (do-parse-arguments iter env))))))
+	       (let ((env (parse-cmd-argument iter env)))
+		 (do-parse-arguments iter env)))))
     (check-groups spec (do-parse-arguments (make-list-iterator :list (arguments-to-list args))))))
 
 (define-condition too-few-arguments-in-group-set (error)
@@ -388,10 +421,10 @@
   (if (find-argument-in-list name args-list)  t nil))
 
 (defun (setf argument-value) (value name args-list)
-  (let ((arg (find-argument-in-list name args-list)))
-    (if arg (setf (rest arg) value))))
-      
+  (aif (find-argument-in-list name args-list)
+       (setf (rest it) value)))
+    
 (defun argument-value (name args-list)
   (let ((arg (find-argument-in-list name args-list)))
     (if arg (values (rest arg) t) (values nil nil))))
-	
+  
