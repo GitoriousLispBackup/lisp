@@ -17,7 +17,10 @@
 ;; General parsing methods
 ;;
 
-(define-condition wrong-key-value-error (error)
+(define-condition missed-key-value-error (cmd-parsing-error)
+  ((type :initarg :type :reader missed-key-value-error-type)))
+
+(define-condition wrong-key-value-error (cmd-parsing-error)
   ((value :initarg :value :reader wrong-key-value-error-value)
    (type :initarg :type :reader wrong-key-value-error-type)))
 
@@ -30,10 +33,12 @@
     (handler-case (let ((result (apply #'parse-type-value (second arg) type type-args)))
 		    (iterator-next value)
 		    result)
-      (error ()
-	(error 'wrong-key-value-error
-	       :value (second arg)
-	       :type (if type-args (cons type type-args) type))))))
+      (wrong-key-value-error (err)
+	(unless (slot-boundp err 'value)
+	  (setf (slot-value err 'value) (second arg)))
+	(unless (slot-boundp err 'type)
+	  (setf (slot-value err 'type) (if type-args (cons type type-args) type)))
+	(error err)))))
 
 ;;
 ;; Parsers for common types
@@ -43,9 +48,24 @@
   (assert (null type-args))
   value)
 
+(define-condition argument-value-too-low-error (wrong-key-value-error)
+  ((min-value :initarg :min-value :reader argument-value-too-low-error-min-value)))
+
+(define-condition argument-value-too-high-error (wrong-key-value-error)
+  ((max-value :initarg :max-value :reader argument-value-too-high-error-max-value)))
+
 (defmethod parse-type-value (value (type (eql 'integer)) &rest type-args)
-  (assert (null type-args))
-  (parse-integer value))
+  (flet ((check-lower-bound (int bound)
+	   (when (< int bound)
+	     (error 'argument-value-too-low-error :min-value bound :value int)))
+	 (check-higher-bound (int bound)
+	   (when (> int bound)
+	     (error 'argument-value-too-high-error :max-value bound :value int))))
+    (assert (<= (length type-args) 2))
+    (let ((value (handler-case (parse-integer value) (error () (error 'wrong-key-value-error)))))
+      (when (>= (length type-args) 1) (check-lower-bound value (first type-args)))
+      (when (>= (length type-args) 2) (check-higher-bound value (second type-args)))
+      value)))
 
 ;;
 ;; Parser for list type

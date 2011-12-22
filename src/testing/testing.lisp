@@ -118,7 +118,7 @@
 
 (defmacro !condition (expression condition &rest arg-forms)
   (let ((condition-sym (gensym)))
-    (labels ((do-check-form (reader value &key (test 'eql))
+    (labels ((do-check-form (reader value &key (test '!equal))
 	     `(,test (,reader ,condition-sym) ,value))
 	     (check-form (form)
 	       (apply #'do-check-form form)))

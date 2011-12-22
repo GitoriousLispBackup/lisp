@@ -301,18 +301,21 @@
 
 ;; Parsing
 
-(define-condition wrong-argument-error (error)
-  ((string :initarg :string :reader wrong-argument-error-string)))
+(define-condition cmd-parsing-error (error) 
+  ((argument :initarg :argument :reader cmd-parsing-error-argument)))
 
-(define-condition wrong-short-argument-error (error)
-  ((char :initarg :char :reader wrong-short-argument-error-char)))
+(defgeneric cmd-parsing-error-message (err))
+
+(define-condition wrong-argument-error (cmd-parsing-error) ())
+(define-condition wrong-short-argument-error (cmd-parsing-error) ())
 
 (defun arguments-to-list (args)
   (flet ((argument-to-list (arg)
 	   (assert (stringp arg))
 	   (cond 
 	     ((and (>= (length arg) 2) (equal (subseq arg 0 2) "--")) `((:arg ,(subseq arg 2))))
-	     ((and (>= (length arg) 1) (equal (char arg 0) #\-))
+	     ((and (>= (length arg) 2) (equal (char arg 0) #\-) (not (or (digit-char-p (char arg 1)) 
+									 (eq (char arg 1) #\.))))
 	      (map 'list #'(lambda (char) `(:short ,char)) (subseq arg 1)))
 	     (t `((:param ,arg))))))
     (apply #'append (mapcar #'argument-to-list args))))
@@ -331,15 +334,13 @@
 (defmethod parse-argument (arg rest)
   nil)
 
-(define-condition missed-key-value-error (error)
-  ((type :initarg :type :reader missed-key-value-error-type)))
-
 (defmethod parse-argument ((arg key) rest)
   (let ((type-spec (key-argument-type arg)))
     (destructuring-bind (type type-args) (if (listp type-spec) 
 					     (list (first type-spec) (rest type-spec))
 					     (list type-spec nil))
-      (apply #'parse-type rest type type-args))))
+      (handler-case (apply #'parse-type rest type type-args)
+	(cmd-parsing-error (err) (setf (slot-value err 'argument) (argument-name arg)) (error err))))))
 
 (defmacro aif (if-clause then-form &optional else-form)
   `(let ((it ,if-clause))
@@ -383,24 +384,22 @@
 	       (ecase (first value)
 		 (:arg (aif (parse-argument (argument-name-test (second value) #'argument-name)
 					    args spec env)
-			    it (error 'wrong-argument-error :string (second value))))
+			    it (error 'wrong-argument-error :argument (second value))))
 		 (:short (aif (parse-argument (argument-name-test (second value) #'argument-short-name)
 					      args spec env)
-			      it (error 'wrong-short-argument-error :char (second value))))
+			      it (error 'wrong-short-argument-error :argument (second value))))
 		 (:param (aif (parse-positional args spec env)
-			      it (error 'wrong-argument-error :string (second value)))))))
+			      it (error 'wrong-argument-error :argument (second value)))))))
 	   (do-parse-arguments (iter &optional env)
 	     (null-cond (iterator-current iter) env
 	       (let ((env (parse-cmd-argument iter env)))
 		 (do-parse-arguments iter env)))))
     (check-groups spec (do-parse-arguments (make-list-iterator :list (arguments-to-list args))))))
 
-(define-condition too-few-arguments-in-group-set (error)
-  ((group :initarg :group :reader too-few-arguments-in-group-set-group)))
+(define-condition too-few-arguments-in-group-set (cmd-parsing-error) ())
 
-(define-condition too-much-arguments-in-group-set (error)
-  ((group :initarg :group :reader too-much-arguments-in-group-set-group)
-   (arguments :initarg :arguments :reader too-much-arguments-in-group-set-arguments)))
+(define-condition too-much-arguments-in-group-set (cmd-parsing-error)
+  ((arguments :initarg :arguments :reader too-much-arguments-in-group-set-arguments)))
 
 (defun check-groups (spec env)
   (flet ((check-group (group)
@@ -409,11 +408,11 @@
 	     (unless (eq (group-args-max group) :infinity)
 	       (when (> (length set-arguments) (group-args-max group))
 		 (error 'too-much-arguments-in-group-set 
-			:group (arguments-list-name group)
-			:arguments set-arguments)))
+			:argument (arguments-list-name group)
+			:arguments (mapcar #'argument-name set-arguments))))
 	     (when (< (length set-arguments) (group-args-min group))
 	       (error 'too-few-arguments-in-group-set
-		      :group (arguments-list-name group))))))
+		      :argument (arguments-list-name group))))))
     (mapc #'check-group (groups spec))
     (mapc #'check-groups (actions spec) (mapcar #'(lambda (action) (argument-value (argument-name action) env)) 
 						(actions spec)))

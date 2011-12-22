@@ -26,7 +26,7 @@
   (let ((args (make-arguments-spec "args" (:flag "flag"))))
     (!condition (parse-arguments '("a-flag") args) 
 		wrong-argument-error
-		(wrong-argument-error-string "a-flag"))))
+		(cmd-parsing-error-argument "a-flag"))))
 
 (deftest base-test argument-with-description ()
   (let ((spec (make-arguments-spec "" (:flag "flag" :description "a test flag"))))
@@ -125,17 +125,17 @@
   (let ((spec (make-arguments-spec "" (:flag "f1" :short-name #\a))))
     (!condition (parse-arguments '("-b") spec) 
 		wrong-short-argument-error
-		(wrong-short-argument-error-char #\b))))
+		(cmd-parsing-error-argument #\b))))
 
 (deftest base-test multiple-short-names-parsing ()
   (let ((spec (make-arguments-spec ""
-		(:flag "f1" :short-name #\1)
-		(:flag "f2" :short-name #\2)
-		(:flag "f3" :short-name #\3))))
-    (let ((args (parse-arguments '("-13") spec)))
-      (!t (argument-set-p "f1" args))
-      (!t (argument-set-p "f3" args))
-      (!null (argument-set-p "f2" args)))))
+		(:flag "fa" :short-name #\a)
+		(:flag "fb" :short-name #\b)
+		(:flag "fc" :short-name #\c))))
+    (let ((args (parse-arguments '("-ac") spec)))
+      (!t (argument-set-p "fa" args))
+      (!t (argument-set-p "fc" args))
+      (!null (argument-set-p "fb" args)))))
 
 (deftest base-test print-short-names ()
   (let ((spec (make-arguments-spec "" (:flag "flag" :short-name #\f :description "some flag"))))
@@ -163,16 +163,18 @@
   (let ((spec (make-arguments-spec "" (:key "key" :type 'integer))))
     (!condition (parse-arguments '("--key" "blabla") spec)
 		wrong-key-value-error
-		(wrong-key-value-error-value "123")
+		(wrong-key-value-error-value "blabla")
 		(wrong-key-value-error-type 'integer))))
 
 (deftest base-test missed-key-value-test ()
   (let ((spec (make-arguments-spec "" (:key "key" :type 'integer))))
     (!condition (parse-arguments '("--key") spec)
 		missed-key-value-error
+		(cmd-parsing-error-argument "key")
 		(missed-key-value-error-type 'integer))
     (!condition (parse-arguments '("--key" "--key") spec)
 		missed-key-value-error
+		(cmd-parsing-error-argument "key")
 		(missed-key-value-error-type 'integer))))
 
 (deftest base-test key-help ()
@@ -253,7 +255,7 @@
   (let ((spec (make-arguments-spec "" (:action "act" :arguments ((:flag "flag"))))))
     (!condition (parse-arguments '("--flag") spec)
 		wrong-argument-error
-		(wrong-argument-error-string "flag"))))
+		(cmd-parsing-error-argument "flag"))))
 
 (deftest base-test parsing-subactions-test ()
   (let ((spec (make-arguments-spec "" (:action "act" :arguments ((:action "act2"))))))
@@ -273,7 +275,7 @@
   (let ((spec (make-arguments-spec "" (:action "a1" :arguments ((:action "a2" :arguments ((:flag "f"))))))))
     (!condition (parse-arguments '("--a1" "--f") spec)
 		wrong-argument-error
-		(wrong-argument-error-string "f"))))
+		(cmd-parsing-error-argument "f"))))
 
 (deftest base-test simple-group ()
   (let ((spec (make-arguments-spec "" (:group "group" :arguments ((:flag "flag1") (:flag "flag2"))))))
@@ -285,7 +287,7 @@
   (let ((spec (make-arguments-spec "" (:group "group" :one-max :arguments ((:flag "f1") (:flag "f2"))))))
     (!condition (parse-arguments '("--f1" "--f2") spec)
 		too-much-arguments-in-group-set
-		(too-much-arguments-in-group-set-group "group")
+		(cmd-parsing-error-argument "group")
 		(too-much-arguments-in-group-set-arguments '("f1" "f2")))))
 
 (deftest base-test groups-in-action-check ()
@@ -294,7 +296,7 @@
 												(:flag "f2"))))))))
     (!condition (parse-arguments '("--act" "--f1" "--f2") spec)
 		too-much-arguments-in-group-set
-		(too-much-arguments-in-group-set-group "group")
+		(cmd-parsing-error-argument "group")
 		(too-much-arguments-in-group-set-arguments '("f1" "f2")))))
 
 (deftest base-test nested-groups-error-test ()
@@ -305,16 +307,16 @@
   (let ((spec (make-arguments-spec "" (:group "g" :one-min :arguments ((:flag "f1"))))))
     (!condition (parse-arguments () spec)
 		too-few-arguments-in-group-set
-		(too-few-arguments-in-group-set-group "g"))))
+		(cmd-parsing-error-argument "g"))))
 								   
 (deftest base-test groups-with-one-only ()
   (let ((spec (make-arguments-spec "" (:group "g" :one-only :arguments ((:flag "f1") (:flag "f2"))))))
     (!condition (parse-arguments () spec)
 		too-few-arguments-in-group-set
-		(too-few-arguments-in-group-set-group "g"))
+		(cmd-parsing-error-argument "g"))
     (!condition (parse-arguments '("--f1" "--f2") spec)
 		too-much-arguments-in-group-set
-		(too-much-arguments-in-group-set-group "g")
+		(cmd-parsing-error-argument "g")
 		(too-much-arguments-in-group-set-arguments '("f1" "f2")))))
 
 (deftest base-test empty-spec-help ()

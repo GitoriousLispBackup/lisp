@@ -22,6 +22,9 @@
 	   #:short-name-already-exists-error
 	   #:short-name-already-exists-error-char
 
+	   #:cmd-parsing-error
+	   #:cmd-parsing-error-argument
+
 	   #:wrong-argument-error
 	   #:wrong-argument-error-string
 
@@ -29,6 +32,7 @@
 	   #:wrong-short-argument-error-char
 
 	   #:wrong-key-value-error
+	   #:wrong-key-value-error-name
 	   #:wrong-key-value-error-value
 	   #:wrong-key-value-error-type
 
@@ -40,5 +44,12 @@
 
 	   #:too-much-arguments-in-group-set
 	   #:too-much-arguments-in-group-set-group
-	   #:too-much-arguments-in-group-set-arguments))
+	   #:too-much-arguments-in-group-set-arguments
+
+	   #:argument-value-too-low-error
+	   #:argument-value-too-low-error-min-value
+
+	   #:argument-value-too-high-error
+	   #:argument-value-too-high-error-max-value))
+
 	   
