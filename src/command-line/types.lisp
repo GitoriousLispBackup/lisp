@@ -38,7 +38,9 @@
 	  (setf (slot-value err 'value) (second arg)))
 	(unless (slot-boundp err 'type)
 	  (setf (slot-value err 'type) (if type-args (cons type type-args) type)))
-	(error err)))))
+	(error err))
+      (error (err)
+	(error 'wrong-key-value-error :type (if type-args (cons type type-args) type) :value (second arg))))))
 
 ;;
 ;; Parsers for common types
@@ -67,6 +69,10 @@
       (when (>= (length type-args) 2) (check-higher-bound value (second type-args)))
       value)))
 
+(defmethod parse-type-value (value (type (eql 'float)) &rest type-args)
+  (assert (null type-args))
+  (parse-real-number value))
+
 ;;
 ;; Parser for list type
 ;;
@@ -81,6 +87,23 @@
   (assert (= (length type-args) 1))
   (if (parameter-p (iterator-current value))
       (cons (apply #'parse-type value type-args) (apply #'parse-type value type type-args))
-      (values nil value)))
+      nil))
 
-  
+;;
+;; Parser for tuples  
+;;
+
+(defmethod type-value-name ((type (eql 'tuple)) &rest type-args)
+  (flet ((argument-name (arg)
+	   (format nil " ~a" arg)))
+    (subseq (apply #'string+ (mapcar #'argument-name type-args)) 1)))
+
+(defmethod parse-type (value (type (eql 'tuple)) &rest type-args)
+  (flet ((as-list (value)
+	   (if (atom value)
+	       (list value)
+	       value)))
+    (if type-args
+	(cons (apply #'parse-type value (as-list (first type-args)))
+	      (apply #'parse-type value 'tuple (rest type-args))))))
+

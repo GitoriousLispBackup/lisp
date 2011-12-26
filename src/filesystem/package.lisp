@@ -89,6 +89,7 @@
 	   fs-file-length
 
 	   common-filesystem
+	   *default-filesystem*
 
 	   make-virtual-filesystem
 	   vfs-cat))

@@ -8,4 +8,5 @@
   :serial t
   :components ((:file "package")
 	       (:file "types")
-	       (:file "base")))
+	       (:file "base"))
+  :depends-on (#:parse-number #:burning-filesystem))

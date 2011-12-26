@@ -1,5 +1,5 @@
 (defpackage #:burning-command-line
-  (:use #:common-lisp)
+  (:use #:common-lisp #:parse-number #:burning-filesystem)
   (:export #:make-argument
 	   #:argument-name
 	   #:argument-description
@@ -26,13 +26,9 @@
 	   #:cmd-parsing-error-argument
 
 	   #:wrong-argument-error
-	   #:wrong-argument-error-string
-
 	   #:wrong-short-argument-error
-	   #:wrong-short-argument-error-char
 
 	   #:wrong-key-value-error
-	   #:wrong-key-value-error-name
 	   #:wrong-key-value-error-value
 	   #:wrong-key-value-error-type
 
@@ -50,6 +46,8 @@
 	   #:argument-value-too-low-error-min-value
 
 	   #:argument-value-too-high-error
-	   #:argument-value-too-high-error-max-value))
+	   #:argument-value-too-high-error-max-value
+
+	   #:tuple))
 
 	   
