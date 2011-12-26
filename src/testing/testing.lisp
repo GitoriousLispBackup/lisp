@@ -32,7 +32,7 @@
 (defparameter *failed-tests* 0)
 
 (defun report-success (report)
-  (funcall *summary-listener* (concatenate 'string report " success."))
+  (declare (ignore report))
   (incf *success-tests*))
 
 (defun report-failure (report)
@@ -57,11 +57,9 @@
   `(progn
      (setf (get ',test-case 'tests) (union (get ',test-case 'tests) (list ',name)))
      (defmethod ,name ((a-case ,test-case ) ,@args)
-       (format t "Running test ~a.~a~%" ',test-case ',name)
        (let ((*test-result* t))
 	 ,@body
-	 (report-result *test-result* ,(concatenate 'string "Test " (string test-case) "." (string name)))
-	 (cond ((not (null *test-result*)) (format t "OK.~%")))))))
+	 (report-result *test-result* ,(concatenate 'string "Test " (string test-case) "." (string name)))))))
 
 (defmacro check (check-expr &body body)
   `(if (not ,check-expr)
@@ -72,7 +70,7 @@
   (let ((value1 (gensym)) (value2 (gensym)))
     `(let ((,value1 ,expr1) (,value2 ,expr2))
        (check (,predicate ,value1 ,value2)
-	      (format t "~a is ~a.Expected ~a which is ~a.~%" ',expr1 ,value1 ',expr2 ,value2)))))
+	      (format t "~a is ~a.~%Expected ~a which is ~a.~%~%" ',expr1 ,value1 ',expr2 ,value2)))))
 
 (defmacro !t (expr) 
   `(check ,expr (format t "~a is nil.~%" ',expr)))
@@ -99,7 +97,7 @@
   (let ((value1 (gensym)) (value2 (gensym)))
     `(let ((,value1 ,expr1) (,value2 ,expr2))
        (check (/= ,value1 ,value2)
-	 (format t "~a is ~a. Expected not ~a.~%" ',expr1 ,value1 ',expr2)))))
+	 (format t "~a is ~a.~%Expected not ~a.~%~%" ',expr1 ,value1 ',expr2)))))
 
 (defun message (error)
   (let ((str (make-array 0 :element-type 'base-char
@@ -112,7 +110,7 @@
 (defmacro !error (expression message)
   `(handler-case
        (progn ,expression
-	      (check nil (format t "~a failed to die.~%" ',expression)))
+	      (check nil (format t "~a failed to die.~%~%" ',expression)))
      (simple-error (error)
        (!equal (message error) ,message))))
 
@@ -124,7 +122,7 @@
 	       (apply #'do-check-form form)))
       `(handler-case
 	   (progn ,expression
-		  (check nil (format t "~a failed to die.~%" ',expression)))
+		  (check nil (format t "~a failed to die.~%~%" ',expression)))
 	 (,condition (,condition-sym)
 	   ,@(mapcar #'check-form arg-forms))))))
 
@@ -132,7 +130,7 @@
   `(handler-case
        ,expression
      (error (err)
-       (check nil (format t "Died with error ~a.~%" err)))))
+       (check nil (format t "Died with error ~a.~%~%" err)))))
 
 (defmacro !every (lambda list)
   (let ((list-sym (gensym))
@@ -140,7 +138,7 @@
     `(let ((,list-sym ,list)
 	   (,lambda-sym ,lambda))
        (check (every ,lambda-sym ,list-sym) 
-	 (format t "~a is not true for all members of ~a." ,lambda-sym ,list-sym)))))
+	 (format t "~a is not true for all members of ~a.~%~%" ,lambda-sym ,list-sym)))))
 
 (defmacro !some (lambda list)
   (let ((list-sym (gensym))
@@ -148,7 +146,7 @@
     `(let ((,list-sym ,list)
 	   (,lambda-sym ,lambda))
        (check (some ,lambda-sym ,list-sym)
-	 (format t "~a if false for all members of ~a." ,lambda-sym ,list-sym)))))
+	 (format t "~a if false for all members of ~a.~%~%" ,lambda-sym ,list-sym)))))
 
 (defun prepare-test ()
   (setq *success-tests* 0)
