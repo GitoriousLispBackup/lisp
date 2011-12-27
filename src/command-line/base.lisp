@@ -301,13 +301,14 @@
 
 ;; Parsing
 
-(define-condition cmd-parsing-error (error) 
-  ((argument :initarg :argument :reader cmd-parsing-error-argument)))
-
-(defgeneric cmd-parsing-error-message (err))
 
 (define-condition wrong-argument-error (cmd-parsing-error) ())
+(defmethod cmd-parsing-error-message ((err wrong-argument-error))
+  (format nil "Wrong argument name: ~a" (cmd-parsing-error-argument err)))
+
 (define-condition wrong-short-argument-error (cmd-parsing-error) ())
+(defmethod cmd-parsing-error-message ((err wrong-short-argument-error))
+  (format nil "Wrong argument short name: ~a" (cmd-parsing-error-argument err)))
 
 (defun arguments-to-list (args)
   (flet ((argument-to-list (arg)
@@ -398,8 +399,15 @@
 
 (define-condition too-few-arguments-in-group-set (cmd-parsing-error) ())
 
+(defmethod cmd-parsing-error-message ((err too-few-arguments-in-group-set))
+  (format nil "Too few arguments in group ~a set" (cmd-parsing-error-argument err)))
+
 (define-condition too-much-arguments-in-group-set (cmd-parsing-error)
   ((arguments :initarg :arguments :reader too-much-arguments-in-group-set-arguments)))
+
+(defmethod cmd-parsing-error-message ((err too-much-arguments-in-group-set))
+  (format nil "Too much arguments in group ~a set:~{ ~a~}" (cmd-parsing-error-argument err)
+	  (too-much-arguments-in-group-set-arguments err)))
 
 (defun check-groups (spec env)
   (flet ((check-group (group)

@@ -24,6 +24,7 @@
 
 	   #:cmd-parsing-error
 	   #:cmd-parsing-error-argument
+	   #:cmd-parsing-error-message
 
 	   #:wrong-argument-error
 	   #:wrong-short-argument-error
@@ -36,10 +37,8 @@
 	   #:missed-key-value-error-type
 
 	   #:too-few-arguments-in-group-set
-	   #:too-few-arguments-in-group-set-group
 
 	   #:too-much-arguments-in-group-set
-	   #:too-much-arguments-in-group-set-group
 	   #:too-much-arguments-in-group-set-arguments
 
 	   #:argument-value-too-low-error
@@ -48,6 +47,16 @@
 	   #:argument-value-too-high-error
 	   #:argument-value-too-high-error-max-value
 
-	   #:tuple))
+	   #:tuple
+
+	   #:wrong-file-path-argument-error
+	   #:wrong-directory-path-argument-error
+
+	   #:existing-file-path
+	   #:existing-directory-path
+
+	   #:creatable-file-path
+	   #:creatable-directory-path))
+
 
 	   

@@ -1,5 +1,12 @@
 (in-package #:burning-command-line)
 
+(define-condition cmd-parsing-error (error) 
+  ((argument :initarg :argument :reader cmd-parsing-error-argument)))
+
+(defgeneric cmd-parsing-error-message (err))
+(defmethod cmd-parsing-error-message ((err cmd-parsing-error))
+  (format nil "Error parsing argument ~a" (cmd-parsing-error-argument err)))
+
 (defgeneric parse-type (values type &rest type-args))
 (defgeneric parse-type-value (value type &rest type-args))
 
@@ -20,9 +27,18 @@
 (define-condition missed-key-value-error (cmd-parsing-error)
   ((type :initarg :type :reader missed-key-value-error-type)))
 
+(defmethod cmd-parsing-error-message ((err missed-key-value-error))
+  (format nil "Missed value for key ~a of type ~a" (cmd-parsing-error-argument err)
+	  (missed-key-value-error-type err)))
+
 (define-condition wrong-key-value-error (cmd-parsing-error)
   ((value :initarg :value :reader wrong-key-value-error-value)
    (type :initarg :type :reader wrong-key-value-error-type)))
+
+(defmethod cmd-parsing-error-message ((err wrong-key-value-error))
+  (format nil "Wrong value for key ~a of type ~a: ~a" (cmd-parsing-error-argument err)
+	  (wrong-key-value-error-type err)
+	  (wrong-key-value-error-value err)))
 
 (defmethod parse-type (value type &rest type-args)
   (let ((arg (iterator-current value)))
@@ -53,8 +69,20 @@
 (define-condition argument-value-too-low-error (wrong-key-value-error)
   ((min-value :initarg :min-value :reader argument-value-too-low-error-min-value)))
 
+(defmethod cmd-parsing-error-message ((err argument-value-too-low-error))
+  (format nil "Value for argument ~a of type ~a - ~a, that is less then ~a" (cmd-parsing-error-argument err)
+	  (wrong-key-value-error-type err)
+	  (wrong-key-value-error-value err)
+	  (argument-value-too-low-error-min-value err)))
+
 (define-condition argument-value-too-high-error (wrong-key-value-error)
   ((max-value :initarg :max-value :reader argument-value-too-high-error-max-value)))
+
+(defmethod cmd-parsing-error-message ((err argument-value-too-high-error))
+  (format nil "Value for argument ~a of type ~a - ~a, that is more then ~a" (cmd-parsing-error-argument err)
+	  (wrong-key-value-error-type err)
+	  (wrong-key-value-error-value err)
+	  (argument-value-too-high-error-max-value err)))
 
 (defmethod parse-type-value (value (type (eql 'integer)) &rest type-args)
   (flet ((check-lower-bound (int bound)
@@ -107,3 +135,42 @@
 	(cons (apply #'parse-type value (as-list (first type-args)))
 	      (apply #'parse-type value 'tuple (rest type-args))))))
 
+;;
+;; Filesystem types
+;;
+
+(define-condition wrong-file-path-argument-error (wrong-key-value-error) ())
+
+(defmethod cmd-parsing-error-message ((err wrong-file-path-argument-error))
+  (format nil "Error parsing argument ~a: ~a isn't correct file path" (cmd-parsing-error-argument err)
+	  (wrong-key-value-error-value err)))
+
+(define-condition wrong-directory-path-argument-error (wrong-key-value-error) ())
+
+(defmethod cmd-parsing-error-message ((err wrong-directory-path-argument-error))
+  (format nil "Error parsing argument ~a: ~a isn't correct directory path" (cmd-parsing-error-argument err)
+	  (wrong-key-value-error-value err)))
+
+(defmethod parse-type-value (value (type (eql 'file-path)) &rest type-args)
+  (assert (null type-args))
+  (handler-case (path-from-string value :type :file) 
+    (wrong-filename-error () 
+      (error 'wrong-file-path-argument-error))))
+
+(defmethod parse-type-value (value (type (eql 'directory-path)) &rest type-args)
+  (assert (null type-args))
+  (path-from-string value :type :directory))
+
+(defmacro define-path-type (type base-type check check-error)
+  `(defmethod parse-type-value (value (type (eql ',type)) &rest type-args)
+     (assert (null type-args))
+     (let ((path (parse-type-value value ',base-type)))
+       (unless (,check path)
+	 (error ',check-error))
+       path)))
+
+(define-path-type existing-file-path file-path path-exists-p wrong-file-path-argument-error)
+(define-path-type existing-directory-path directory-path path-exists-p wrong-directory-path-argument-error)
+(define-path-type creatable-file-path file-path correct-path-p wrong-file-path-argument-error)
+(define-path-type creatable-directory-path directory-path correct-path-p wrong-directory-path-argument-error)
+  
