@@ -61,19 +61,26 @@
 
 (defgeneric arguments-list-name (list))
 
-(defun check-arguments-list (list)
+(defun do-check-arguments-list (list)
   (labels ((have-same-names (args)
 	     (cond
 	       ((null args) nil)
 	       ((have-same-name (first args) (rest args)))
 	       (t (have-same-names (rest args))))))
-    (let ((duplicate (have-same-names (arguments-list-arguments list :include-positionals nil))))
+    (let ((duplicate (have-same-names list)))
       (if duplicate (error duplicate) t))))
 
-(defun add-argument (arg list)
-  (when (have-argument-p (argument-name arg) list)
-    (error 'argument-already-exists-error :name (argument-name arg)))
-  (push arg (%arguments-list-arguments list)))
+(defun check-arguments-list (list)
+  (do-check-arguments-list (arguments-list-arguments list :include-positionals nil)))
+
+(defun do-add-argument (arg list &optional (group-name "ARGS"))
+  (do-check-arguments-list (cons arg (arguments-list-arguments list :include-positionals nil)))
+  (let ((group (find group-name (groups list) :test #'equal :key #'arguments-list-name)))
+    (setf (%arguments-list-arguments group)
+	  (nconc (%arguments-list-arguments group) (list arg)))))
+
+(defmacro add-argument (arg list &key (group nil))
+  `(do-add-argument ,(parse-argument-spec (first arg) (rest arg)) ,list ,@(if group (list group) ())))
 
 (defun argument (name list)
   (find name (arguments-list-arguments list) :test #'equal :key #'argument-name))

@@ -48,8 +48,6 @@ FFI
     clisp      +
     sbcl       +
     clozurecl  + 
-    ecl        -
-    abcl       -
   C++
     gcc
     VS2010

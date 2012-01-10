@@ -40,15 +40,27 @@
 
 (deftest base-test adding-arguments ()
   (let ((spec (make-arguments-spec "" (:flag "flag1"))))
-    (add-argument (make-argument :flag "flag2") spec)
+    (add-argument (:flag "flag2") spec)
     (!t (have-argument-p "flag1" spec))
     (!t (have-argument-p "flag2" spec))))
   
 (deftest base-test adding-argument-twice ()
   (let ((spec (make-arguments-spec "" (:flag "flag"))))
-    (!condition (add-argument (make-argument :flag "flag") spec)
+    (!condition (add-argument (:flag "flag") spec)
 		argument-already-exists-error
 		(argument-already-exists-error-name "flag"))))
+
+(deftest base-test added-arguments-help ()
+  (let ((spec (make-arguments-spec "")))
+    (add-argument (:flag "flag" :description "a flag") spec)
+    (!equal (help-message spec)
+	    (lines "Usage:"
+		   "   [ARGS ...]"
+		   ""
+		   "  Where ARGS are:"
+		   '("    --help" 10 "Products this help message")
+		   '("    --flag" 10 "a flag")
+		   ""))))
 
 ;;
 ;; Base help messages test
@@ -358,6 +370,18 @@
 
 (deftest base-test group-name-same-as-arguments ()
   (!condition-safe (make-arguments-spec "" (:group "arg" :arguments ((:flag "arg"))))))
+
+(deftest base-test adding-argument-to-group ()
+  (let ((spec (make-arguments-spec ("" :no-help) (:group "group"))))
+    (add-argument (:flag "flag" :description "a flag") spec :group "group")
+    (!t (have-argument-p "flag" spec))
+    (!equal (help-message spec)
+	    (lines "Usage:"
+		   "   [group ...]"
+		   ""
+		   "  Where group are:"
+		   '("    --flag" 10 "a flag")
+		   ""))))
 
 (deftest base-test defining-positional ()
   (let ((spec (make-arguments-spec "" (:positional "key" :type 'integer))))
