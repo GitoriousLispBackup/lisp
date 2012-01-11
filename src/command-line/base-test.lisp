@@ -66,18 +66,6 @@
 ;; Base help messages test
 ;;
 
-(defun lines (&rest args)
-  (labels ((line (arg)
-	     (cond 
-	       ((atom arg) (format nil "~a~%" arg))
-	       ((null (rest arg)) (line (first arg)))
-	       (t (concatenate 'string
-			       (format nil "~a~va" (first arg) (second arg) "")
-			       (line (rest (rest arg))))))))
-    (cond
-      ((null args) "")
-      (t (concatenate 'string (line (first args)) (apply #'lines (rest args)))))))
-
 (deftest base-test help-message-test ()
   (!equal (help-message (make-arguments-spec ""))
 	  (lines "Usage:"

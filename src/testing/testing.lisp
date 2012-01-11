@@ -1,25 +1,26 @@
 
 (defpackage :burning-testing
   (:use common-lisp)
-  (:export :defcase
-	   :deftest
-	   :!t
-	   :!not
-	   :!null
-	   :!=
-	   :equal-check
-	   :!eq
-	   :!equal
-	   :!equalp
-	   :!<>
-	   :!condition
-	   :!condition-safe
-	   :!error
-	   :!every
-	   :!some
-	   :run-test
-	   :run-case
-	   :run-tests))
+  (:export #:defcase
+	   #:deftest
+	   #:!t
+	   #:!not
+	   #:!null
+	   #:!=
+	   #:equal-check
+	   #:!eq
+	   #:!equal
+	   #:!equalp
+	   #:!<>
+	   #:!condition
+	   #:!condition-safe
+	   #:!error
+	   #:!every
+	   #:!some
+	   #:lines
+	   #:run-test
+	   #:run-case
+	   #:run-tests))
 
 (in-package :burning-testing)
 
@@ -159,6 +160,18 @@
 
 (defun do-run-test (name case)
   (funcall name (make-instance case)))
+
+(defun lines (&rest args)
+  (labels ((line (arg)
+	     (cond 
+	       ((atom arg) (format nil "~a~%" arg))
+	       ((null (rest arg)) (line (first arg)))
+	       (t (concatenate 'string
+			       (format nil "~a~va" (first arg) (second arg) "")
+			       (line (rest (rest arg))))))))
+    (cond
+      ((null args) "")
+      (t (concatenate 'string (line (first args)) (apply #'lines (rest args)))))))
 
 (defun run-test (name case-name)
   (prepare-test)
