@@ -4,4 +4,20 @@
 	   #:repository
 	   #:make-repository
 	   #:repository-version
-	   #:entities))
+	   #:entities
+
+	   #:wrong-repository-node-name
+	   #:wrong-repository-node-name-name
+
+	   #:repository-api-version-does-not-specified
+
+	   #:add-entity
+	   #:remove-entity
+
+	   #:make-unit
+	   #:unit-name
+	   #:unit-files
+
+f	   #:unit-with-same-name-already-exists
+	   #:unit-with-same-name-already-exists-name))
+
