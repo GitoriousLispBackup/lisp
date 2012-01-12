@@ -30,5 +30,10 @@
 	   #:group-name
 
 	   #:entity-with-same-name-already-exists
-	   #:entity-with-same-name-already-exists-name))
+	   #:entity-with-same-name-already-exists-name
+
+	   #:*repository-class*
+	   #:*unit-class*
+
+	   #:define-btr-class))
 

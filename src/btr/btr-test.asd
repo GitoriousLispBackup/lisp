@@ -7,5 +7,6 @@
   :licence "GPL v3"
   :serial t
   :components ((:file "test-package")
-	       (:file "repository-test"))
+	       (:file "repository-test")
+	       (:file "extensions-test"))
   :depends-on (#:burning-btr #:burning-testing))
