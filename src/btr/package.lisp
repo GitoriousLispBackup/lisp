@@ -4,20 +4,31 @@
 	   #:repository
 	   #:make-repository
 	   #:repository-version
+
+	   #:entity
+	   #:entity-name
 	   #:entities
 
-	   #:wrong-repository-node-name
-	   #:wrong-repository-node-name-name
+	   #:wrong-xml-node-name
+	   #:wrong-xml-node-name-expected
+	   #:wrong-xml-node-name-got
 
-	   #:repository-api-version-does-not-specified
+	   #:missed-xml-attribute-warning
+	   #:missed-xml-attribute-warning-name
+	   #:missed-xml-attribute-warning-node-name
 
 	   #:add-entity
 	   #:remove-entity
 
+	   #:unit
 	   #:make-unit
 	   #:unit-name
 	   #:unit-files
 
-f	   #:unit-with-same-name-already-exists
-	   #:unit-with-same-name-already-exists-name))
+	   #:group
+	   #:make-group
+	   #:group-name
+
+	   #:entity-with-same-name-already-exists
+	   #:entity-with-same-name-already-exists-name))
 
