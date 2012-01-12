@@ -62,35 +62,7 @@
   (make-instance 'group :name name :entities ()))
 
 ;;
-;; Writing
-;;
-
-(defgeneric entity-to-xml (entity))
-
-(defmethod entity-to-xml ((unit unit))
-  (flet ((file-to-xml (file)
-	     (make-xml-node "file" (list `("name" ,file)))))
-    (make-xml-node "unit" (list `("name" ,(entity-name unit)))
-		   (mapcar #'file-to-xml (unit-files unit)))))
-
-(defmethod entity-to-xml ((group group))
-  (make-xml-node "group" `(("name" ,(entity-name group))) (mapcar #'entity-to-xml (entities group))))
-
-(defun repository-to-xml (repo)
-  (make-xml-node "repository" 
-		 `(("version" ,(repository-version repo)))
-		 (mapcar #'entity-to-xml (entities repo))))
-
-(defun print-repository (repo stream)
-  (flet ((do-print (stream) 
-	   (xml-print (repository-to-xml repo) stream)))
-    (if stream
-	(do-print stream)
-	(with-output-to-string (stream)
-	  (do-print stream)))))
-
-;;
-;; Reading from xml
+;; Xml attributes
 ;;
 
 (defstruct attribute
@@ -113,6 +85,9 @@
 (defun set-attribute (obj attribute node)
   (setf (slot-value obj (attribute-name attribute)) (attribute-value attribute node)))
 
+(defun set-xml-attribute (obj attribute node)
+  (setf (xml-attribute node (attribute-name-string attribute)) (slot-value obj (attribute-name attribute))))
+
 (defvar *attributes* (make-hash-table))
 
 (defmacro define-class-attributes (class &body attributes)
@@ -125,6 +100,40 @@
 (define-class-attributes repository (version "version" *repository-api-version*))
 (define-class-attributes unit (name "name"))
 (define-class-attributes group (name "name"))
+
+;;
+;; Writing
+;;
+
+(defun attributes-to-xml (node obj class)
+  (mapc #'(lambda (attr) (set-xml-attribute obj attr node)) (gethash class *attributes*)))
+
+(defgeneric entity-to-xml (entity))
+
+(defmethod entity-to-xml ((unit unit))
+  (flet ((file-to-xml (file)
+	     (make-xml-node "file" (list `("name" ,file)))))
+    (let ((node (make-xml-node "unit" () (mapcar #'file-to-xml (unit-files unit)))))
+      (attributes-to-xml node unit *unit-class*)
+      node)))
+
+(defmethod entity-to-xml ((group group))
+  (let ((node (make-xml-node "group" () (mapcar #'entity-to-xml (entities group)))))
+    (attributes-to-xml node group 'group)
+    node))
+
+(defun repository-to-xml (repo)
+  (let ((node (make-xml-node "repository" () (mapcar #'entity-to-xml (entities repo)))))
+    (attributes-to-xml node repo *repository-class*)
+    node))
+
+(defun print-repository (repo stream)
+  (flet ((do-print (stream) 
+	   (xml-print (repository-to-xml repo) stream)))
+    (if stream
+	(do-print stream)
+	(with-output-to-string (stream)
+	  (do-print stream)))))
 
 ;;
 ;; Reading
@@ -172,6 +181,4 @@
     (let ((repository (make-repository :entities (mapcar #'entity-from-xml (xml-childs xml)))))
       (initialize-entity-attributes repository *repository-class* xml)
       repository)))
-
-
 
