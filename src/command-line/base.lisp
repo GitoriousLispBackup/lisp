@@ -6,7 +6,7 @@
 
 (defclass argument ()
   ((name :initarg :name :reader argument-name)
-   (short-name :initarg :short-name :reader argument-short-name)
+   (short-name :initarg :short-name :initform nil :reader argument-short-name)
    (description :initarg :description :reader argument-description)
    (group :initarg :group :reader argument-group)))
 
@@ -80,7 +80,7 @@
 	  (nconc (%arguments-list-arguments group) (list arg)))))
 
 (defmacro add-argument (arg list &key (group nil))
-  `(do-add-argument ,(parse-argument-spec (first arg) (rest arg)) ,list ,@(if group (list group) ())))
+  `(do-add-argument ,arg ,list ,@(if group (list group) ())))
 
 (defun argument (name list)
   (find name (arguments-list-arguments list) :test #'equal :key #'argument-name))

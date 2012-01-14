@@ -19,6 +19,7 @@
 	   file-path-p
 	   directory-path-p
 
+	   path=
 	   path-host
 	   path-device
 	   path-path
@@ -26,11 +27,13 @@
 	   path-name
 	   path-type
 	   path-version
+	   path-filesystem
 
 	   parent-path
 	   root-path
 	   copy-path
 	   path+
+	   path-
 	   path-as-file
 	   path-as-directory
 	   relative-path-p
@@ -54,6 +57,10 @@
 	   open-file
 	   close-stream
 	   with-file
+	   length-of-file
+
+	   read-file
+	   write-file
 
 	   file-lock-error
 	   file-lock-error-path
@@ -92,4 +99,5 @@
 	   *default-filesystem*
 
 	   make-virtual-filesystem
-	   vfs-cat))
+	   vfs-cat
+	   vfs-cd))

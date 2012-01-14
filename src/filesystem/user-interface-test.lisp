@@ -116,7 +116,7 @@
   (let ((dir (path-from-string "dir/" :fs fs))
 	(path (path-from-string "dir/file" :fs fs)))
     (!condition (make-file path) directory-does-not-exist-error
-		(directory-does-not-exist-error-path dir))))
+		(directory-does-not-exist-error-path dir :test equalp))))
 
 (def-ui-test make-directory-test
   (let ((path (path-from-string "a.directory/" :fs fs)))
@@ -135,7 +135,7 @@
   (let ((parent (path-from-string "outer.dir/" :fs fs))
 	(path (path-from-string "outer.dir/inner.dir/" :fs fs)))
     (!condition (make-directory path) directory-does-not-exist-error
-		(directory-does-not-exist-error-path parent))))
+		(directory-does-not-exist-error-path parent :test equal))))
 
 (def-ui-test correct-file-path-on-existing-file 
   (let ((path (path-from-string "a.file" :fs fs)))
@@ -200,10 +200,10 @@
   (!as-file= "/dir/" "/dir")
   (let ((path (path-from-string "" :fs fs)))
     (!condition (path-as-file path) wrong-file-path-error
-		(wrong-file-path-error-path path)))
+		(wrong-file-path-error-path path :test equalp)))
   (let ((path (path-from-string "/" :fs fs)))
     (!condition (path-as-file path) wrong-file-path-error
-		(wrong-file-path-error-path path))))
+		(wrong-file-path-error-path path :test equalp))))
 
 (defmacro !as-directory= (name directory-name)
   `(path-check ,name path-as-directory ,directory-name))
@@ -299,6 +299,16 @@
     (!path= (path+ a-file r-dir) r-dir)
     (!path= (path+ r-file r-dir) r-dir)
     (!path= (path+ a-dir r-dir r-dir r-file) (path-from-string "/dir1/dir2/dir1/dir2/dir1/dir2/dir/file" :fs fs))))
+
+(def-ui-test path-delta-test 
+  (!path= (path- (path-from-string "/dir1/dir2/dir3/a.file" :fs fs) (path-from-string "/dir1/dir2/" :fs fs))
+	  (path-from-string "dir3/a.file" :fs fs))
+  (!path= (path- (path-from-string "/dir1/dir2/dir3/a.file" :fs fs) (path-from-string "dir1/dir2/" :fs fs))
+	  nil)
+  (!path= (path- (path-from-string "/dir1/dir2/dir3/" :fs fs) (path-from-string "/dir1/dir2/" :fs fs))
+	  (path-from-string "dir3/" :fs fs))
+  (!path= (path- (path-from-string "/dir1/" :fs fs) (path-from-string "/dir2/" :fs fs))
+	  nil))
 
 (def-ui-test properties-concatenation 
   (let ((directory1 (%make-up (make-dp 'host1 'device1 '(:absolute "dir1" "dir2")) fs))
@@ -487,3 +497,23 @@
     (with-file (in path :direction :input)
       (!equal (read-line in) "A test string"))))
 
+(def-ui-test read-file-test 
+  (let ((path (path-from-string "file" :fs fs))
+	(string (lines "a very long line"
+			 "and another one")))
+    (with-file (stream path  :direction :output)
+      (write-sequence string stream))
+    (!equal (read-file path) string)))
+
+(def-ui-test write-file-test
+  (flet ((check-write (path string)
+	   (write-file path string)
+	   (let ((read-string (make-string (length-of-file path))))
+	     (with-file (stream path)
+	       (read-sequence read-string stream)
+	       (!equal read-string string)))))
+    (let ((path (path-from-string "file" :fs fs)))
+      (check-write path (lines "one line" "and another"))
+      (check-write path "other line"))))
+    
+    

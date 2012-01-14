@@ -7,6 +7,9 @@
   path
   filesystem)
 
+(defun path-filesystem (path)
+  (ui-path-filesystem path))
+
 (defmacro bind-ui-path ((path-symbol fs-symbol) ui-path &body body)
   (let ((ui-path-sym (gensym)))
     `(let ((,ui-path-sym ,ui-path))
@@ -36,6 +39,9 @@
 ;; Path utitlity functions
 ;;
 
+(defun path= (path1 path2)
+  (equalp path1 path2))
+
 (defun copy-path (path &key 
 		  (new-directory nil directory-p)
 		  (new-host nil host-p)
@@ -59,7 +65,7 @@
 	       (when type-p (setf (file-type file) new-type))
 	       (when version-p (setf (file-version file) new-version))
 	       file)))
-    (let ((file-p (or (file-path-p path) name-p type-p version-p)))
+    (let ((file-p (or (file-path-p path) new-name new-type new-version)))
       (bind-ui-path (path fs) path
 	(if file-p
 	    (make-ui-path :path (copy-file path) :filesystem fs)
@@ -153,6 +159,26 @@
 		 path2
 		 (copy-path path2 :new-directory (directory+ (path-directory path1) (path-directory path2))))))
     (reduce #'file+ paths)))
+
+(defun path- (path1 path2)
+  (labels ((path-diff (path1 path2)
+	     (cond 
+	       ((null path2) (cons :relative path1))
+	       ((null path1) nil)
+	       ((equal (first path1) (first path2)) (path-diff (rest path1) (rest path2)))
+	       (t nil))))
+    (if (path= (root-path path1) (root-path path2))
+	(let ((diff (path-diff (path-path path1) (path-path path2))))
+	  (if diff
+	      (copy-path path1
+			 :new-host nil
+			 :new-device nil
+			 :new-path diff
+			 :new-name (path-name path1)
+			 :new-type (path-type path1)
+			 :new-version (path-version path1))
+	      nil))
+	nil)))
 
 ;;
 ;; Checking paths
@@ -349,6 +375,10 @@
 (defun close-stream (stream &optional (fs *default-filesystem*))
   (fs-close-stream fs stream))
 
+(defun length-of-file (path)
+  (bind-ui-path (path fs) path
+    (fs-file-length fs path)))
+
 (defmacro with-file ((stream path &key 
 			     (direction nil direction-p) 
 			     (element-type nil element-p)
@@ -365,7 +395,15 @@
 	 (unwind-protect (progn ,@body)
 	   (close-stream ,stream (ui-path-filesystem ,path-sym)))))))
 
+(defun read-file (path)
+  (with-file (stream path)
+    (let ((string (make-string (length-of-file path))))
+      (read-sequence string stream)
+      string)))
 
+(defun write-file (path string)
+  (with-file (stream path :direction :output :if-exists :supersede)
+    (write-sequence string stream)))
 
 
 		

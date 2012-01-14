@@ -172,7 +172,7 @@
 		 (t (error 'wrong-xml-node-name :got (xml-node-name node) :expected '("unit" "group"))))))
     (let* ((type (node-type))
 	   (obj (parse-entity-from-xml type node)))
-      (initialize-entity-attributes obj type node)
+      (initialize-entity-attributes obj (type-of obj) node)
       obj)))
 
 (defun read-repository (stream)

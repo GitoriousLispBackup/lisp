@@ -35,5 +35,18 @@
 	   #:*repository-class*
 	   #:*unit-class*
 
-	   #:define-btr-class))
+	   #:define-btr-class
+
+	   #:repository-path
+	   #:write-repository
+
+	   #:btr-run
+
+	   #:no-action-specified-error
+	   #:too-much-actions-specified-error
+
+	   #:repository-already-exists-error
+	   #:repository-already-exists-error-path))
+
+
 
