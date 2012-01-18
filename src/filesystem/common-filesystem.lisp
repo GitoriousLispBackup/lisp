@@ -125,9 +125,9 @@
 
 (defmethod fs-current-directory ((fs (eql 'common-filesystem)))
   #+clisp
-  (ext:absolute-pathname "")
+  (from-pathname (ext:absolute-pathname ""))
   #+sbcl
-  (merge-pathnames "")
+  (from-pathname (merge-pathnames ""))
   #-(or clisp sbcl)
   (call-next-method))
 

@@ -74,13 +74,28 @@
   (do-check-arguments-list (arguments-list-arguments list :include-positionals nil)))
 
 (defun do-add-argument (arg list &optional (group-name "ARGS"))
-  (do-check-arguments-list (cons arg (arguments-list-arguments list :include-positionals nil)))
-  (let ((group (find group-name (groups list) :test #'equal :key #'arguments-list-name)))
-    (setf (%arguments-list-arguments group)
-	  (nconc (%arguments-list-arguments group) (list arg)))))
+  (unless (typep arg 'group)
+    (do-check-arguments-list (cons arg (arguments-list-arguments list :include-positionals nil))))
+  (if (group-p arg)
+      (setf (%arguments-list-arguments list)
+	    (nconc (%arguments-list-arguments list) (list arg)))
+      (let ((group (find group-name (groups list) :test #'equal :key #'arguments-list-name)))
+	(setf (%arguments-list-arguments group)
+	      (nconc (%arguments-list-arguments group) (list arg)))
+	(setf (slot-value arg 'group) group)
+	(when (typep arg 'action)
+	  (setf (slot-value arg 'parent) list)))))
 
 (defmacro add-argument (arg list &key (group nil))
   `(do-add-argument ,arg ,list ,@(if group (list group) ())))
+
+(defmacro argument-from-spec (spec)
+  (parse-argument-spec (first spec) (rest spec)))
+
+(set-dispatch-macro-character #\# #\A 
+			      #'(lambda (stream c1 c2)
+				  (let ((spec (read stream t nil t)))
+				    `(argument-from-spec ,spec))))
 
 (defun argument (name list)
   (find name (arguments-list-arguments list) :test #'equal :key #'argument-name))
@@ -190,6 +205,8 @@
   (defmethod parse-argument-spec ((class (eql :action)) spec)
     (let ((args (find-key :arguments spec))
 	  (spec (remove-key :arguments spec)))
+      (unless (find-key :description spec)
+	(setf spec (append spec '(:description ""))))
       `(make-arguments-list 'action ,spec ,args))))
 
 (defmethod arguments-list-description ((list action))
@@ -429,8 +446,9 @@
 	       (error 'too-few-arguments-in-group-set
 		      :argument (arguments-list-name group))))))
     (mapc #'check-group (groups spec))
-    (mapc #'check-groups (actions spec) (mapcar #'(lambda (action) (argument-value (argument-name action) env)) 
-						(actions spec)))
+    (let ((actions (remove-if-not #'(lambda (act) (argument-set-p (argument-name act) env)) (actions spec))))
+      (mapc #'check-groups actions
+	    (mapcar #'(lambda (action) (argument-value (argument-name action) env)) actions)))
     env))
 
 (defun find-argument-in-list (name list)

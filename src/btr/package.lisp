@@ -43,10 +43,19 @@
 	   #:btr-run
 
 	   #:no-action-specified-error
+
 	   #:too-much-actions-specified-error
+	   #:too-much-actions-specified-error-actions
 
 	   #:repository-already-exists-error
-	   #:repository-already-exists-error-path))
+	   #:repository-already-exists-error-path
+
+	   #:repository-does-not-exist-error
+	   #:repository-does-not-exist-error-path
+
+	   #:path-is-not-in-repository-error
+	   #:path-is-not-in-repository-error-path
+	   #:path-is-not-in-repository-error-repository-path))
 
 
 

@@ -88,7 +88,8 @@
 (defun set-xml-attribute (obj attribute node)
   (setf (xml-attribute node (attribute-name-string attribute)) (slot-value obj (attribute-name attribute))))
 
-(defvar *attributes* (make-hash-table))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defvar *attributes* (make-hash-table)))
 
 (defmacro define-class-attributes (class &body attributes)
   (flet ((attribute-form (attribute)
@@ -186,17 +187,19 @@
 ;; Extending default classes
 ;;
 
-(defun key-argument-value (name list)
-  (cond
-    ((null list) (values nil nil))
-    ((eq (first list) name) (values (second list) t))
-    (t (key-argument-value name (rest list)))))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun key-argument-value (name list)
+    (cond
+      ((null list) (values nil nil))
+      ((eq (first list) name) (values (second list) t))
+      (t (key-argument-value name (rest list))))))
 
-(defun remove-key-argument (name list)
-  (cond 
-    ((null list) nil)
-    ((eq (first list) name) (remove-key-argument name (rest (rest list))))
-    (t (cons (first list) (remove-key-argument name (rest list))))))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun remove-key-argument (name list)
+    (cond 
+      ((null list) nil)
+      ((eq (first list) name) (remove-key-argument name (rest (rest list))))
+      (t (cons (first list) (remove-key-argument name (rest list)))))))
 
 (defmacro define-btr-class (name base-class &body slots)
   (labels ((name (slot)

@@ -49,7 +49,9 @@
 
 	   list-directory
 	   resolve-path
+
 	   as-absolute-path
+	   as-relative-path
 
 	   home-directory
 	   current-directory

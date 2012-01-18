@@ -484,6 +484,18 @@
   (!as-absolute= "/dir/other.dir/etc" "/dir/other.dir/etc")
   (!as-absolute= "a.dir/../other.dir/./dir/./file.ext" "/work/other.dir/dir/file.ext"))
 
+(defmacro !as-relative= ((path base) expected)
+  `(!equal (path-to-string (as-relative-path (path-from-string ,path :fs fs) (path-from-string ,base :fs fs)))
+	   ,expected))
+
+(def-ui-test as-relative-path-test
+  (!as-relative= ("a.dir/a.file" "") "a.dir/a.file")
+  (!as-relative= ("dir1/dir2/dir3/a.file" "dir1/dir2/") "dir3/a.file")
+  (!as-relative= ("dir1/dir2/dir3/a.file" "dir1/a.dir/dir2/") "../../dir2/dir3/a.file")
+  (!as-relative= ("/dir1/dir2/a.file" "/dir1/other.dir/") "../dir2/a.file")
+  (!as-relative= ("dir/a.file" "/dir/") "../work/dir/a.file")
+  (!as-relative= ("/dir/a.file" "dir/") "../../dir/a.file"))
+
 (def-ui-test home-directory-test
   (!path= (home-directory fs) (path-from-string "/home/" :fs fs)))
 

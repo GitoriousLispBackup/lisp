@@ -40,19 +40,19 @@
 
 (deftest base-test adding-arguments ()
   (let ((spec (make-arguments-spec "" (:flag "flag1"))))
-    (add-argument (:flag "flag2") spec)
+    (add-argument (make-argument :flag "flag2") spec)
     (!t (have-argument-p "flag1" spec))
     (!t (have-argument-p "flag2" spec))))
   
 (deftest base-test adding-argument-twice ()
   (let ((spec (make-arguments-spec "" (:flag "flag"))))
-    (!condition (add-argument (:flag "flag") spec)
+    (!condition (add-argument (make-argument :flag "flag") spec)
 		argument-already-exists-error
 		(argument-already-exists-error-name "flag"))))
 
 (deftest base-test added-arguments-help ()
   (let ((spec (make-arguments-spec "")))
-    (add-argument (:flag "flag" :description "a flag") spec)
+    (add-argument (make-argument :flag "flag" :description "a flag") spec)
     (!equal (help-message spec)
 	    (lines "Usage:"
 		   "   [ARGS ...]"
@@ -361,7 +361,7 @@
 
 (deftest base-test adding-argument-to-group ()
   (let ((spec (make-arguments-spec ("" :no-help) (:group "group"))))
-    (add-argument (:flag "flag" :description "a flag") spec :group "group")
+    (add-argument (make-argument :flag "flag" :description "a flag") spec :group "group")
     (!t (have-argument-p "flag" spec))
     (!equal (help-message spec)
 	    (lines "Usage:"
@@ -370,6 +370,42 @@
 		   "  Where group are:"
 		   '("    --flag" 10 "a flag")
 		   ""))))
+
+(deftest base-test empty-action-help ()
+  (let ((spec (make-arguments-spec ("" :no-help) (:action "act" :no-help))))
+    (!equal (help-message spec)
+	    (lines "Usage:"
+		   "   [ARGS ...]"
+		   ""
+		   "  Where ARGS are:"
+		   '("    --act" 10 "")
+		   ""))))
+
+(deftest base-test added-arguments-parent ()
+  (let ((spec (make-arguments-spec "spec"))
+	(action #A(:action "act" :no-help)))
+    (add-argument action spec)
+    (!equal (help-message action)
+	    (lines "Usage:"
+		   "  spec --act"
+		   ""))))
+
+(deftest base-test adding-group ()
+  (let ((spec (make-arguments-spec ("" :no-help))))
+    (add-argument #A(:group "group" :no-help :arguments ((:flag "flag"))) spec)
+    (!equal (help-message spec)
+	    (lines "Usage:"
+		   "   [group ...]"
+		   ""
+		   "  Where group are:"
+		   '("    --flag" 10 "")
+		   ""))))
+
+(deftest base-test adding-positional ()
+  (let ((spec (make-arguments-spec "")))
+    (add-argument #A(:positional "bla" :type 'string) spec)
+    (let ((args (parse-arguments '("blabla") spec)))
+      (!equal (argument-value "bla" args) "blabla"))))
 
 (deftest base-test defining-positional ()
   (let ((spec (make-arguments-spec "" (:positional "key" :type 'integer))))

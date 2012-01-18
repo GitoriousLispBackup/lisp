@@ -235,6 +235,22 @@
 	(as-absolute-path (path+ (current-directory (ui-path-filesystem path)) path))
 	(%as-absolute-path path))))
 	   
+(defun as-relative-path (path base)
+  (labels ((way-up (list)
+	     (mapcar #'(lambda (x) (declare (ignore x)) "..") 
+		     list))
+	   (find-way (list1 list2)
+	     (cond 
+	       ((null list1) (way-up list2))
+	       ((null list2) list1)
+	       ((equal (first list1) (first list2)) (find-way (rest list1) (rest list2)))
+	       (t (append (way-up list2) list1)))))
+    (when (and (relative-path-p path) (absolute-path-p base))
+      (setf path (as-absolute-path path)))
+    (when (and (absolute-path-p path) (relative-path-p base))
+      (setf base (as-absolute-path base)))
+    (copy-path path :new-path (cons :relative (find-way (path-path path) (path-path base))))))
+
 ;;
 ;; Making and deleting filesystem objects
 ;;

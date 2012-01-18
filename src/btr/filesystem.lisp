@@ -10,6 +10,10 @@
 	     (print-repository repository stream))))
     (save-configuration (configuration-path path))))
 
+(defun open-repository (path)
+  (with-file (stream (path+ path (path-from-string ".btr/repository.conf")))
+    (read-repository stream)))
+
 (defun repository-path (path)
   (cond
     ((file-path-p path) (repository-path (parent-path path)))
