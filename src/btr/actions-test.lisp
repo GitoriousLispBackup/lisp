@@ -85,15 +85,15 @@
 	  (lines "<repository version=\"0.1\">"
 		 "  <group name=\"dir\">"
 		 "    <unit name=\"file1\">"
-		 "      <file name=\"file1\"/>"
+		 "      <file name=\"dir/file1\"/>"
 		 "    </unit>"
 		 "    <unit name=\"file2\">"
-		 "      <file name=\"file2\"/>"
+		 "      <file name=\"dir/file2\"/>"
 		 "    </unit>"
 		 "  </group>"
 		 "  <group name=\"dir2\">"
 		 "    <unit name=\"file\">"
-		 "      <file name=\"file\"/>"
+		 "      <file name=\"dir2/file\"/>"
 		 "    </unit>"
 		 "  </group>"
 		 "</repository>")))
@@ -135,9 +135,17 @@
 		 " dir/file1 "
 		 " dir/file2 ")))
 
-;;listing groups
+(def-action-test listing-groups
+  (mapcar #'make-file-from-string '("file1" "dir/file2"))
+  (btr-run '("--create"))
+  (btr-run '("--add" "file1" "dir/file2"))
+  (!equal (with-standard-output-to-string (btr-run '("--ls")))
+	  (lines " Name  "
+		 ""
+		 " dir/  "
+		 " file1 ")))
 
-(def-action-test lising-recursive 
+(def-action-test listing-recursive 
   (mapcar #'make-file-from-string '("file1" "dir1/file2" "dir1/file3" "dir2/file4"))
   (btr-run '("--create"))
   (btr-run '("--add" "file1" "dir1/file2" "dir1/file3" "dir2/file4"))
@@ -149,13 +157,31 @@
 		 " dir2/file4 "
 		 " file1      ")))
 
-;;listing from subdirectory
-;;listing from outside
+(def-action-test listing-from-other-directory
+  (mapcar #'make-file-from-string '("file1" "dir/file2"))
+  (btr-run '("--create"))
+  (btr-run '("--add" "file1" "dir/file2"))
+  (vfs-cd (path-from-string "dir/"))
+  (!equal (with-standard-output-to-string (btr-run '("--ls" "-r")))
+	  (lines " Name     "
+		 ""
+		 " file2    "
+		 " ../file1 ")))
+
+(def-action-test listing-from-outside 
+  (mapcar #'make-file-from-string '("file1" "dir/file2"))
+  (btr-run '("--create"))
+  (btr-run '("--add" "file1" "dir/file2"))
+  (vfs-cd (path-from-string "/home/"))
+  (!equal (with-standard-output-to-string (btr-run '("--ls" "-r" "-R" "/work")))
+	  (lines " Name            "
+		 ""
+		 " /work/dir/file2 "
+		 " /work/file1     ")))
 
 ;;removing tests 
 ;;removing groups
 
-;;listing groups
 
 
     

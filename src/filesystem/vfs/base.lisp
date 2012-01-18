@@ -80,7 +80,7 @@
   (labels 
       ((parse-type (string)
 	 (let ((args (divide string #\. :from-end t)))
-	   (if (not (eq (position #\. string) 0))
+	   (if (not (eq (position #\. string :from-end t) 0))
 	       (make-file-path :name (first args) :type (second args))
 	       (make-file-path :name (concatenate 'string "." (second args))))))
        (parse-version (string)

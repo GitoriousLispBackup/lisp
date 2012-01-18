@@ -19,4 +19,9 @@
     ((file-path-p path) (repository-path (parent-path path)))
     ((path-exists-p (configuration-path path)) path)
     ((parent-path path) (repository-path (parent-path path)))
+    ((relative-path-p path) 
+     (let ((absolute-path (repository-path (as-absolute-path path))))
+       (if absolute-path
+	   (as-relative-path absolute-path path)
+	   nil)))
     (t nil)))

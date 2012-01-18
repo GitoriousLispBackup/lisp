@@ -158,4 +158,6 @@
     (!equalp (fs-as-file-path fs (fs-path-from-string fs "/dir1/dir2/dir3.dir4/"))
 	     (make-fp (make-dp nil nil '(:absolute "dir1" "dir2")) "dir3" "dir4" nil))
     (!equalp (fs-as-directory-path fs (fs-path-from-string fs "/dir1/dir2/dir3.dir4"))
-	     (make-dp nil nil '(:absolute "dir1" "dir2" "dir3.dir4")))))
+	     (make-dp nil nil '(:absolute "dir1" "dir2" "dir3.dir4")))
+    (!equalp (fs-as-directory-path fs (fs-path-from-string fs ".."))
+	     (make-dp nil nil '(:relative "..")))))
