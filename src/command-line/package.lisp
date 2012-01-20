@@ -49,12 +49,17 @@
 
 	   #:tuple
 
+	   #:path
+
+	   #:wrong-path-argument-error
 	   #:wrong-file-path-argument-error
 	   #:wrong-directory-path-argument-error
 
+	   #:existing-path
 	   #:existing-file-path
 	   #:existing-directory-path
 
+	   #:creatable-path
 	   #:creatable-file-path
 	   #:creatable-directory-path))
 

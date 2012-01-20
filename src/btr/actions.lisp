@@ -150,7 +150,7 @@
     (flet ((print-with-padding (string padding)
 	     (format t " ~va ~%" padding string)))
       (let* ((names (group-names repository path (argument-set-p "recursive" args)))
-	     (padding (apply #'max (mapcar #'length names))))
+	     (padding (apply #'max (length "Name") (mapcar #'length names))))
 	(format t " ~va ~%~%" padding "Name")
 	(mapc #'(lambda (string) (print-with-padding string padding)) names)
 	nil))))
@@ -161,3 +161,48 @@
 	       :description "a directory to list"
 	       :optional)
   (:flag "recursive" :short-name #\r :description "List all subdirectries"))
+
+;;
+;; Rm action
+;;
+
+(define-condition file-is-not-in-repository-error (error)
+  ((path :initarg :path :reader file-is-not-in-repository-error-path)
+   (repository-path :initarg :repository-path :reader file-is-not-in-repository-error-repository-path)))
+
+(defun find-existing-group (path repository)
+  (if (null path)
+      repository
+      (let ((group (find (first path) (entities repository) :test #'equal :key #'entity-name)))
+	(if (and group (typep group 'group))
+	    (find-existing-group (rest path) group)
+	    nil))))
+
+(defun remove-unit (path repository)
+  (let ((path (path-as-file path)))
+    (let ((group (find-existing-group (rest (path-path path)) repository))
+	  (name (path-to-string (copy-path path :new-path '(:relative)))))
+      (unless (and group (find name (entities group) :test #'equal :key #'entity-name))
+	(error 'file-is-not-in-repository-error :path path :repository-path (repository-path path)))
+      (remove-entity (path-to-string (copy-path path :new-path '(:relative))) group))))
+
+(define-repository-action "rm" (path args)
+  (check-repository-exists path)
+  (let ((repository (open-repository (repository-path path)))
+	(files (argument-value "files" (argument-value "rm" args)))
+	(repository-path (repository-path path)))
+    (flet ((to-relative-path (path)
+	     (let ((path (path- (as-absolute-path path) (as-absolute-path repository-path))))
+	       (unless path
+		 (error 'path-is-not-in-repository-error :repository-path repository-path :path path))
+	       path)))
+      (mapc #'(lambda (path) (remove-unit path repository))
+	    (mapcar #'to-relative-path files)))
+    (write-repository repository repository-path)))
+
+(define-action-arguments "rm"
+  (:positional "files"
+	       :type '(list existing-path)
+	       :description "a paths of files or directiries to be removed"))
+	       
+  

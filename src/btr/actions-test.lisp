@@ -11,8 +11,17 @@
   (!condition (btr-run '())
 	      no-action-specified-error))
 
-(def-action-test creation-test 
+(defun make-files-from-string (&rest names)
+  (mapc #'(lambda (name) (make-file (path-from-string name) :recursive t)) names))
+
+(defun init-repository (&rest file-names)
   (btr-run '("--create"))
+  (apply #'make-files-from-string file-names)
+  (when file-names
+    (btr-run (cons "--add" file-names))))
+
+(def-action-test creation-test 
+  (init-repository)
   (!t (path-exists-p (path-from-string "/work/.btr/repository.conf")))
   (!equal (read-file (path-from-string "/work/.btr/repository.conf"))
 	  (lines "<repository version=\"0.1\"/>")))
@@ -34,9 +43,7 @@
 	      (wrong-key-value-error-value "/bla1/bla2")))
 
 (def-action-test adding-unit
-  (write-file (path-from-string "file") "a test one")
-  (btr-run '("--create"))
-  (btr-run '("--add" "file"))
+  (init-repository "file")
   (!equal (read-file (path-from-string ".btr/repository.conf"))
 	  (lines "<repository version=\"0.1\">"
 		 "  <unit name=\"file\">"
@@ -45,11 +52,7 @@
 		 "</repository>")))
 
 (def-action-test adding-several-units
-  (write-file (path-from-string "file") "")
-  (write-file (path-from-string "file2") "")
-  (write-file (path-from-string "file3") "")
-  (btr-run '("--create"))
-  (btr-run '("--add" "file" "file2" "file3"))
+  (init-repository "file" "file2" "file3")
   (!equal (read-file (path-from-string ".btr/repository.conf"))
 	  (lines "<repository version=\"0.1\">"
 		 "  <unit name=\"file\">"
@@ -76,11 +79,7 @@
 	      (too-much-actions-specified-error-actions '("add" "create"))))
 
 (def-action-test adding-groups
-  (make-file (path-from-string "dir/file1") :recursive t)
-  (make-file (path-from-string "dir/file2") :recursive t)
-  (make-file (path-from-string "dir2/file") :recursive t)
-  (btr-run '("--create"))
-  (btr-run '("--add" "dir/file1" "dir/file2" "dir2/file"))
+  (init-repository "dir/file1" "dir/file2" "dir2/file")
   (!equal (read-file (path-from-string ".btr/repository.conf"))
 	  (lines "<repository version=\"0.1\">"
 		 "  <group name=\"dir\">"
@@ -106,18 +105,13 @@
 	      (path-is-not-in-repository-error-path (path-from-string "/home/file") :test path=)
 	      (path-is-not-in-repository-error-repository-path (path-from-string "/work/") :test path=)))
 
-(defun make-file-from-string (string)
-  (make-file (path-from-string string) :recursive t))
-
 (defmacro with-standard-output-to-string (&body body)
   `(let ((*standard-output* (make-string-output-stream)))
      ,@body
      (get-output-stream-string *standard-output*)))
 
 (def-action-test simple-listing
-  (mapcar #'make-file-from-string '("file1" "a-very-long-file-name" "file3"))
-  (btr-run '("--create"))
-  (btr-run '("--add" "file1" "a-very-long-file-name" "file3"))
+  (init-repository "file1" "a-very-long-file-name" "file3")
   (!equal (with-standard-output-to-string (btr-run '("--ls")))
 	  (lines " Name                  " 
 		 "" 
@@ -126,9 +120,7 @@
 		 " file3                 ")))
 
 (def-action-test listing-subdirectory 
-  (mapcar #'make-file-from-string '("dir/file1" "dir/file2"))
-  (btr-run '("--create"))
-  (btr-run '("--add" "dir/file1" "dir/file2"))
+  (init-repository "dir/file1" "dir/file2")
   (!equal (with-standard-output-to-string (btr-run '("--ls" "dir")))
 	  (lines " Name      "
 		 ""
@@ -136,9 +128,7 @@
 		 " dir/file2 ")))
 
 (def-action-test listing-groups
-  (mapcar #'make-file-from-string '("file1" "dir/file2"))
-  (btr-run '("--create"))
-  (btr-run '("--add" "file1" "dir/file2"))
+  (init-repository "file1" "dir/file2")
   (!equal (with-standard-output-to-string (btr-run '("--ls")))
 	  (lines " Name  "
 		 ""
@@ -146,9 +136,7 @@
 		 " file1 ")))
 
 (def-action-test listing-recursive 
-  (mapcar #'make-file-from-string '("file1" "dir1/file2" "dir1/file3" "dir2/file4"))
-  (btr-run '("--create"))
-  (btr-run '("--add" "file1" "dir1/file2" "dir1/file3" "dir2/file4"))
+  (init-repository "file1" "dir1/file2" "dir1/file3" "dir2/file4")
   (!equal (with-standard-output-to-string (btr-run '("--ls" "-r")))
 	  (lines " Name       "
 		 ""
@@ -158,9 +146,7 @@
 		 " file1      ")))
 
 (def-action-test listing-from-other-directory
-  (mapcar #'make-file-from-string '("file1" "dir/file2"))
-  (btr-run '("--create"))
-  (btr-run '("--add" "file1" "dir/file2"))
+  (init-repository "file1" "dir/file2")
   (vfs-cd (path-from-string "dir/"))
   (!equal (with-standard-output-to-string (btr-run '("--ls" "-r")))
 	  (lines " Name     "
@@ -169,9 +155,7 @@
 		 " ../file1 ")))
 
 (def-action-test listing-from-outside 
-  (mapcar #'make-file-from-string '("file1" "dir/file2"))
-  (btr-run '("--create"))
-  (btr-run '("--add" "file1" "dir/file2"))
+  (init-repository "file1" "dir/file2")
   (vfs-cd (path-from-string "/home/"))
   (!equal (with-standard-output-to-string (btr-run '("--ls" "-r" "-R" "/work")))
 	  (lines " Name            "
@@ -179,8 +163,74 @@
 		 " /work/dir/file2 "
 		 " /work/file1     ")))
 
-;;removing tests 
-;;removing groups
+(def-action-test removing-tests
+  (init-repository "file1" "dir/file2")
+  (btr-run '("--rm" "file1"))
+  (!equal (with-standard-output-to-string (btr-run '("--ls" "-r")))
+	  (lines " Name      "
+		 ""
+		 " dir/file2 " ))
+  (btr-run '("--rm" "dir/file2"))
+  (!equal (with-standard-output-to-string (btr-run '("--ls" "-r")))
+	  (lines " Name "
+		 "")))
+
+(defun !path= (path1 path2)
+  (!t (path= path1 path2)))
+
+(def-action-test removing-wrong-files
+  (init-repository "true.file" "dir/true.file")
+  (make-files-from-string "false.file" "dir/other.false.file" "false.dir/some.file")
+  (flet ((check-repository ()
+	   (!equal (with-standard-output-to-string (btr-run '("--ls" "-r")))
+		   (lines " Name          "
+			  ""
+			  " dir/true.file "
+			  " true.file     "))))
+    (!condition (btr-run '("--rm" "false.file"))
+		file-is-not-in-repository-error
+		(file-is-not-in-repository-error-path (path-from-string "false.file") :test !path=)
+		(file-is-not-in-repository-error-repository-path (path-from-string "") :test !path=))
+    (!condition (btr-run '("--rm" "dir/other.false.file"))
+		file-is-not-in-repository-error)
+    (!condition (btr-run '("--rm" "false.dir/some.file"))
+		file-is-not-in-repository-error
+		(file-is-not-in-repository-error-path (path-from-string "false.dir/some.file") :test !path=)
+		(file-is-not-in-repository-error-repository-path (path-from-string "") :test !path=))
+    (check-repository)))
+
+(def-action-test removing-from-subdirectory
+  (init-repository "file" "dir/file")
+  (vfs-cd (path-from-string "dir/"))
+  (btr-run '("--rm" "../file"))
+  (!equal (with-standard-output-to-string (btr-run '("--ls" ".." "-r")))
+	  (lines " Name "
+		 ""
+		 " file ")))
+
+(def-action-test removing-from-outside
+  (init-repository "file")
+  (vfs-cd (path-from-string "/home/"))
+  (btr-run '("--rm" "-R" "/work" "/work/file"))
+  (!equal (with-standard-output-to-string (btr-run '("--ls" "-R" "/work" "-r")))
+	  (lines " Name "
+		 "")))
+
+(def-action-test removing-directory
+  (init-repository "dir/file")
+  (btr-run '("--rm" "dir/file"))
+  (btr-run '("--rm" "dir"))
+  (!equal (with-standard-output-to-string (btr-run '("--ls")))
+	  (lines " Name "
+		 "")))
+
+;;removing non-empty group error
+
+;;removing group with files
+;;removing group with subgroups
+
+;;remoning root error
+
 
 
 

@@ -110,6 +110,11 @@
     (!parse ("--path" "/bla") spec
       (!equalp "path" (path-from-string "/bla/")))))
 
+(def-fs-type-test path-argument
+  (let ((spec (make-arguments-spec "" (:key "path" :type 'path))))
+    (!parse ("--path" "/bla/blabla") spec
+      (!equalp "path" (path-from-string "/bla/blabla")))))
+
 (def-fs-type-test existing-path-test
   (make-file (path-from-string "/bla/blabla/bla.bla") :recursive t)
   (make-directory (path-from-string "/bla/blabla/bla/") :recursive t)
@@ -124,7 +129,16 @@
     (!parse ("--path" "/bla/blabla/bla/") spec
       (!equalp "path" (path-from-string "/bla/blabla/bla/")))
     (!condition (parse-arguments '("--path" "/bla/blabla/bla.bla") spec)
-		wrong-directory-path-argument-error)))
+		wrong-directory-path-argument-error))
+  (let ((spec (make-arguments-spec "" (:key "path" :type 'existing-path))))
+    (!parse ("--path" "/bla/blabla/bla/") spec
+      (!equalp "path" (path-from-string "/bla/blabla/bla/")))
+    (!parse ("--path" "/bla/blabla/bla") spec
+      (!equalp "path" (path-from-string "/bla/blabla/bla/")))
+    (!parse ("--path" "/bla/blabla/bla.bla") spec
+      (!equalp "path" (path-from-string "/bla/blabla/bla.bla")))
+    (!condition (parse-arguments '("--path" "/other/path") spec)
+		wrong-path-argument-error)))
 
 (def-fs-type-test creatable-path-test
   (make-file (path-from-string "a.file"))
@@ -146,7 +160,14 @@
     (!condition (parse-arguments '("--path" "a.file/") spec)
 		wrong-directory-path-argument-error)
     (!condition (parse-arguments '("--path" "wrong.dir/a.dir/") spec)
-		wrong-directory-path-argument-error)))
+		wrong-directory-path-argument-error))
+  (let ((spec (make-arguments-spec "" (:key "path" :type 'creatable-path))))
+    (!parse ("--path" "a.directory/") spec
+      (!equalp "path" (path-from-string "a.directory/")))
+    (!parse ("--path" "a.file") spec
+      (!equalp "path" (path-from-string "a.file")))
+    (!condition (parse-arguments '("--path" "wrong.dir/a.dir/") spec)
+		wrong-path-argument-error)))
 
 (defmacro !error-message ((err &rest arguments) message)
   `(!equal (cmd-parsing-error-message (make-instance ',err ,@arguments))

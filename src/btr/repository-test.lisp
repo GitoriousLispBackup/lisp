@@ -59,7 +59,7 @@
   (let ((unit (make-unit "unit"))
 	(repo (make-repository)))
     (add-entity unit repo)
-    (remove-entity unit repo)
+    (remove-entity "unit" repo)
     (!eq (entities repo) ())))
 
 (deftest repository-test units-with-same-name ()
@@ -79,9 +79,9 @@
     (add-entity unit2 repo)
     (add-entity unit3 repo)
     (!equal (entities repo) (list unit1 unit2 unit3))
-    (remove-entity unit2 repo)
+    (remove-entity "unit2" repo)
     (!equal (entities repo) (list unit1 unit3))
-    (remove-entity unit3 repo)
+    (remove-entity "unit3" repo)
     (!equal (entities repo) (list unit1))))
 
 (deftest repository-test print-units ()
@@ -169,9 +169,9 @@
     (add-entity unit2 subgroup)
     (add-entity unit3 group)
     (mapc #'!entity= (entities group) (list unit1 subgroup unit3))
-    (remove-entity unit1 group)
+    (remove-entity "unit1" group)
     (mapc #'!entity= (entities group) (list subgroup unit3))
-    (remove-entity subgroup group)
+    (remove-entity "subgroup" group)
     (mapc #'!entity= (entities group) (list unit3))))
 
 (deftest repository-test print-groups ()

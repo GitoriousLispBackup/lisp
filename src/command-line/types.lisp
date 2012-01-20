@@ -139,6 +139,12 @@
 ;; Filesystem types
 ;;
 
+(define-condition wrong-path-argument-error (wrong-key-value-error) ())
+
+(defmethod cmd-parsing-error-message ((err wrong-path-argument-error))
+  (format nil "Error parsing argument ~a: ~a isn't correct path" (cmd-parsing-error-argument err)
+	  (wrong-key-value-error-value err)))
+
 (define-condition wrong-file-path-argument-error (wrong-key-value-error) ())
 
 (defmethod cmd-parsing-error-message ((err wrong-file-path-argument-error))
@@ -150,6 +156,12 @@
 (defmethod cmd-parsing-error-message ((err wrong-directory-path-argument-error))
   (format nil "Error parsing argument ~a: ~a isn't correct directory path" (cmd-parsing-error-argument err)
 	  (wrong-key-value-error-value err)))
+
+(defmethod parse-type-value (value (type (eql 'path)) &rest type-args)
+  (assert (null type-args))
+  (handler-case (path-from-string value)
+    (wrong-filename-error ()
+      (error 'wrong-path-argument-error))))
 
 (defmethod parse-type-value (value (type (eql 'file-path)) &rest type-args)
   (assert (null type-args))
@@ -171,6 +183,16 @@
 
 (define-path-type existing-file-path file-path path-exists-p wrong-file-path-argument-error)
 (define-path-type existing-directory-path directory-path path-exists-p wrong-directory-path-argument-error)
+
+(defmethod parse-type-value (value (type (eql 'existing-path)) &rest type-args)
+  (assert (null type-args))
+  (let ((path (parse-type-value value 'path)))
+    (cond
+      ((path-exists-p path) path)
+      ((and (file-path-p path) (path-exists-p (path-as-directory path))) (path-as-directory path))
+      (t (error 'wrong-path-argument-error)))))
+
+(define-path-type creatable-path path correct-path-p wrong-path-argument-error)
 (define-path-type creatable-file-path file-path correct-path-p wrong-file-path-argument-error)
 (define-path-type creatable-directory-path directory-path correct-path-p wrong-directory-path-argument-error)
   

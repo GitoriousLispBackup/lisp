@@ -24,8 +24,8 @@
     (error 'entity-with-same-name-already-exists :name (entity-name entity)))
   (setf (entities list) (nconc (entities list) (list entity))))
 
-(defun remove-entity (entity list)
-  (setf (entities list) (remove (entity-name entity) (entities list) :test #'equal :key #'entity-name)))
+(defun remove-entity (name list)
+  (setf (entities list) (remove name (entities list) :test #'equal :key #'entity-name)))
 
 
 ;;

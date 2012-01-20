@@ -55,7 +55,11 @@
 
 	   #:path-is-not-in-repository-error
 	   #:path-is-not-in-repository-error-path
-	   #:path-is-not-in-repository-error-repository-path))
+	   #:path-is-not-in-repository-error-repository-path
+
+	   #:file-is-not-in-repository-error
+	   #:file-is-not-in-repository-error-path
+	   #:file-is-not-in-repository-error-repository-path))
 
 
 
