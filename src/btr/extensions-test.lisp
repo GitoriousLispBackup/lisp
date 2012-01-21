@@ -13,7 +13,8 @@
 (defmacro def-extension-test (name &body body)
   `(deftest extension-test ,name ()
      (let ((*repository-class* 'my-repository)
-	   (*unit-class* 'my-unit))
+	   (*unit-class* 'my-unit)
+	   (*default-filesystem* (make-virtual-filesystem)))
        ,@body)))
 
 (def-extension-test creating-repository
@@ -56,3 +57,31 @@
       (!equal (entity-name unit) "u")
       (!equal (mu-owner unit) "burning")
       (!eq (mu-version unit) 101))))
+
+(def-extension-test lising-extended-units
+  (init-repository)
+  (write-file (path-from-string ".btr/repository.conf") 
+	      (lines "<repository version=0 a_name=123 status=\"no\">"
+		     "  <unit name=\"u\" owner=\"burning\" version=101/>"
+		     "  <group name=\"g\">"
+		     "    <unit name=\"u2\" owner=\"me\" version=202/>"
+		     "  </group>"
+		     "</repository>"))
+  (!equal (with-standard-output-to-string (btr-run '("--ls" "-r")))
+	  (lines " Path  version  owner   "
+		 ""
+		 " g/u2  202      me      "
+		 " u     101      burning "))
+  (!equal (with-standard-output-to-string (btr-run '("--ls")))
+	  (lines " Path  version  owner   "
+		 ""
+		 " g/   "
+		 " u     101      burning ")))
+
+(define-repository-function my-repository :create (repository args)
+  (setf (mr-name repository) "created repository"))
+
+(def-extension-test initialize-function-extension 
+  (btr-run '("--create"))
+  (!equal (read-file (path-from-string ".btr/repository.conf"))
+	  (lines "<repository version=\"0.1\" a_name=\"created repository\" status=\"unspecified\"/>")))

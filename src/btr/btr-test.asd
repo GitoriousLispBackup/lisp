@@ -8,7 +8,7 @@
   :serial t
   :components ((:file "test-package")
 	       (:file "repository-test")
-	       (:file "extensions-test")
 	       (:file "filesystem-test")
-	       (:file "actions-test"))
+	       (:file "actions-test")
+	       (:file "extensions-test"))
   :depends-on (#:burning-btr #:burning-testing))

@@ -9,6 +9,9 @@
 	   #:entity-name
 	   #:entities
 
+	   #:btr-error
+	   #:btr-error-string
+
 	   #:wrong-xml-node-name
 	   #:wrong-xml-node-name-expected
 	   #:wrong-xml-node-name-got
@@ -36,6 +39,10 @@
 	   #:*unit-class*
 
 	   #:define-btr-class
+	   #:define-repository-action
+	   #:define-action-arguments
+
+	   #:define-repository-function
 
 	   #:repository-path
 	   #:write-repository
@@ -59,7 +66,8 @@
 
 	   #:file-is-not-in-repository-error
 	   #:file-is-not-in-repository-error-path
-	   #:file-is-not-in-repository-error-repository-path))
-
-
-
+	   #:file-is-not-in-repository-error-repository-path
+	   
+	   #:directory-is-not-empty-error
+	   #:directory-is-not-empty-error-path
+	   #:directory-is-not-empty-error-repository-path))

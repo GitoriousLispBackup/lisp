@@ -73,6 +73,7 @@
 (define-repository-action "create" (path args)
   (check-repository-does-not-exist path)
   (let ((repository (make-repository)))
+    (initialize-repository repository args)
     (write-repository repository path)))
 
 ;;
@@ -117,25 +118,45 @@
 ;; Ls action
 ;;
 
-(defun group-names (group path &optional recursive-p)
-  (labels ((entity-path (entity)
+(defun entity-path-string (entity path)
+  (flet ((entity-path (entity)
 	     (let ((local-path (path+ path (path-from-string (entity-name entity) 
 							     :type (if (typep entity 'unit) :file :directory)))))
 	       (if (relative-path-p local-path)
 		   (as-relative-path local-path (current-directory))
-		   local-path)))
-	   (entity-string (entity)
-	     (path-to-string (entity-path entity))))
-    (let ((units (remove-if-not #'(lambda (entity) (typep entity 'unit)) (entities group)))
-	  (groups (remove-if-not #'(lambda (entity) (typep entity 'group)) (entities group))))
-      (flet ((group-strings (group)
-	       (if recursive-p 
-		   (group-names group 
-				(copy-path path :new-path (append (path-path path) (list (entity-name group))))
-				t)
-		   (list (entity-string group)))))
-	(append (reduce #'append (mapcar #'group-strings groups))
-		(mapcar #'entity-string units))))))
+		   local-path))))
+    (path-to-string (entity-path entity))))
+
+(defun entity-strings (entity path)
+  (let ((attributes (gethash *unit-class* *attributes*)))
+    (let ((attribute-names (mapcar #'attribute-name-string attributes))
+	  (attribute-values (mapcar #'(lambda (attribute) 
+					(slot-value entity (attribute-name attribute))) 
+				    attributes)))
+      (let ((attributes (remove "name" (mapcar #'cons attribute-names attribute-values) :test #'equal :key #'first)))
+	(list (cons "Path" (mapcar #'first attributes))
+	      (cons (entity-path-string entity path) (mapcar #'rest attributes)))))))
+
+(defun group-names (group path &optional recursive-p)
+  (let ((units (remove-if-not #'(lambda (entity) (typep entity 'unit)) (entities group)))
+	(groups (remove-if-not #'(lambda (entity) (typep entity 'group)) (entities group))))
+    (flet ((group-strings (group)
+	     (if recursive-p 
+		 (group-names group 
+			      (copy-path path :new-path (append (path-path path) (list (entity-name group))))
+			      t)
+		 (list (list "Path") (list (entity-path-string group path))))))
+      (let ((group-attributes (mapcar #'group-strings groups))
+	    (unit-attributes (mapcar #'(lambda (entity) (entity-strings entity path)) units)))
+	(let ((group-header (first (first group-attributes)))
+	      (unit-header (first (first unit-attributes)))
+	      (group-attributes (mapcar #'rest group-attributes))
+	      (unit-attributes (mapcar #'second unit-attributes)))
+	  (append (cond (unit-header (list unit-header))
+			(group-header (list group-header))
+			(t nil))
+		  (reduce #'append group-attributes)
+		  unit-attributes))))))
 
 (define-repository-action "ls" (path args)
   (check-repository-exists path)
@@ -147,12 +168,32 @@
 			      (as-absolute-path (repository-path path)))))
 	(setf repository (find-group (rest (path-path list-path)) repository))
 	(setf path (path+ path list-path))))
-    (flet ((print-with-padding (string padding)
-	     (format t " ~va ~%" padding string)))
+    (labels ((print-with-padding (string padding)
+	       (format t " ~va " padding string))
+	     (padding (name strings)
+	       (apply #'max (length name) (mapcar #'length strings)))
+	     (map-max (fun f1 f2)
+	       (cond
+		 ((and (first f1) (first f2)) (cons (funcall fun (first f1) (first f2))
+						    (map-max fun (rest f1) (rest f2))))
+		 ((first f1) (cons (funcall fun (first f1) 0)
+				   (map-max fun (rest f1) nil)))
+		 (t nil)))
+	     (print-line (name paddings)
+	       (mapc #'print-with-padding name paddings)
+	       (format t "~%")))
       (let* ((names (group-names repository path (argument-set-p "recursive" args)))
-	     (padding (apply #'max (length "Name") (mapcar #'length names))))
-	(format t " ~va ~%~%" padding "Name")
-	(mapc #'(lambda (string) (print-with-padding string padding)) names)
+	     (paddings (make-list (apply #'max 0 (mapcar #'length names)) :initial-element 0)))
+	(when names
+	  (mapc #'(lambda (name) 
+		    (setf paddings 
+			  (map-max #'(lambda (padding string)
+				       (max padding (length (format nil "~a" string))))
+				   paddings name))) 
+		names)
+	  (print-line (first names) paddings))
+	(format t "~%")
+	(mapc #'(lambda (name) (print-line name paddings)) (rest names))
 	nil))))
 
 (define-action-arguments "ls" 
@@ -178,31 +219,46 @@
 	    (find-existing-group (rest path) group)
 	    nil))))
 
-(defun remove-unit (path repository)
+(define-condition directory-is-not-empty-error (error)
+  ((path :initarg :path :reader directory-is-not-empty-error-path)
+   (repository-path :initarg :repository-path :reader directory-is-not-empty-error-repository-path)))
+
+(defun remove-unit (path repository &optional recursive)
   (let ((path (path-as-file path)))
     (let ((group (find-existing-group (rest (path-path path)) repository))
 	  (name (path-to-string (copy-path path :new-path '(:relative)))))
       (unless (and group (find name (entities group) :test #'equal :key #'entity-name))
 	(error 'file-is-not-in-repository-error :path path :repository-path (repository-path path)))
-      (remove-entity (path-to-string (copy-path path :new-path '(:relative))) group))))
+      (let* ((entity-name (path-to-string (copy-path path :new-path '(:relative))))
+	     (entity (find entity-name (entities group) :test #'equal :key #'entity-name)))
+	(when (and (typep entity 'group) (entities entity) (not recursive))
+	  (error 'directory-is-not-empty-error
+		 :path (path-as-directory path)
+		 :repository-path (repository-path path)))
+	(remove-entity entity-name group)))))
 
 (define-repository-action "rm" (path args)
   (check-repository-exists path)
   (let ((repository (open-repository (repository-path path)))
 	(files (argument-value "files" (argument-value "rm" args)))
+	(args (argument-value "rm" args))
 	(repository-path (repository-path path)))
     (flet ((to-relative-path (path)
 	     (let ((path (path- (as-absolute-path path) (as-absolute-path repository-path))))
 	       (unless path
 		 (error 'path-is-not-in-repository-error :repository-path repository-path :path path))
 	       path)))
-      (mapc #'(lambda (path) (remove-unit path repository))
+      (mapc #'(lambda (path) (remove-unit path repository (argument-set-p "recursive" args)))
 	    (mapcar #'to-relative-path files)))
     (write-repository repository repository-path)))
 
 (define-action-arguments "rm"
   (:positional "files"
 	       :type '(list existing-path)
-	       :description "a paths of files or directiries to be removed"))
+	       :description "a paths of files or directiries to be removed")
+  (:flag "recursive"
+	 :short-name #\r
+	 :description "recursive remove entity and it's subentites"))
+
 	       
   

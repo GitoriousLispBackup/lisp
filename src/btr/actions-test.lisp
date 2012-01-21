@@ -113,7 +113,7 @@
 (def-action-test simple-listing
   (init-repository "file1" "a-very-long-file-name" "file3")
   (!equal (with-standard-output-to-string (btr-run '("--ls")))
-	  (lines " Name                  " 
+	  (lines " Path                  " 
 		 "" 
 		 " file1                 " 
 		 " a-very-long-file-name " 
@@ -122,7 +122,7 @@
 (def-action-test listing-subdirectory 
   (init-repository "dir/file1" "dir/file2")
   (!equal (with-standard-output-to-string (btr-run '("--ls" "dir")))
-	  (lines " Name      "
+	  (lines " Path      "
 		 ""
 		 " dir/file1 "
 		 " dir/file2 ")))
@@ -130,7 +130,7 @@
 (def-action-test listing-groups
   (init-repository "file1" "dir/file2")
   (!equal (with-standard-output-to-string (btr-run '("--ls")))
-	  (lines " Name  "
+	  (lines " Path  "
 		 ""
 		 " dir/  "
 		 " file1 ")))
@@ -138,7 +138,7 @@
 (def-action-test listing-recursive 
   (init-repository "file1" "dir1/file2" "dir1/file3" "dir2/file4")
   (!equal (with-standard-output-to-string (btr-run '("--ls" "-r")))
-	  (lines " Name       "
+	  (lines " Path       "
 		 ""
 		 " dir1/file2 "
 		 " dir1/file3 "
@@ -149,7 +149,7 @@
   (init-repository "file1" "dir/file2")
   (vfs-cd (path-from-string "dir/"))
   (!equal (with-standard-output-to-string (btr-run '("--ls" "-r")))
-	  (lines " Name     "
+	  (lines " Path     "
 		 ""
 		 " file2    "
 		 " ../file1 ")))
@@ -158,7 +158,7 @@
   (init-repository "file1" "dir/file2")
   (vfs-cd (path-from-string "/home/"))
   (!equal (with-standard-output-to-string (btr-run '("--ls" "-r" "-R" "/work")))
-	  (lines " Name            "
+	  (lines " Path            "
 		 ""
 		 " /work/dir/file2 "
 		 " /work/file1     ")))
@@ -167,13 +167,12 @@
   (init-repository "file1" "dir/file2")
   (btr-run '("--rm" "file1"))
   (!equal (with-standard-output-to-string (btr-run '("--ls" "-r")))
-	  (lines " Name      "
+	  (lines " Path      "
 		 ""
 		 " dir/file2 " ))
   (btr-run '("--rm" "dir/file2"))
   (!equal (with-standard-output-to-string (btr-run '("--ls" "-r")))
-	  (lines " Name "
-		 "")))
+	  (lines "")))
 
 (defun !path= (path1 path2)
   (!t (path= path1 path2)))
@@ -183,7 +182,7 @@
   (make-files-from-string "false.file" "dir/other.false.file" "false.dir/some.file")
   (flet ((check-repository ()
 	   (!equal (with-standard-output-to-string (btr-run '("--ls" "-r")))
-		   (lines " Name          "
+		   (lines " Path          "
 			  ""
 			  " dir/true.file "
 			  " true.file     "))))
@@ -204,7 +203,7 @@
   (vfs-cd (path-from-string "dir/"))
   (btr-run '("--rm" "../file"))
   (!equal (with-standard-output-to-string (btr-run '("--ls" ".." "-r")))
-	  (lines " Name "
+	  (lines " Path "
 		 ""
 		 " file ")))
 
@@ -213,29 +212,24 @@
   (vfs-cd (path-from-string "/home/"))
   (btr-run '("--rm" "-R" "/work" "/work/file"))
   (!equal (with-standard-output-to-string (btr-run '("--ls" "-R" "/work" "-r")))
-	  (lines " Name "
-		 "")))
+	  (lines "")))
 
 (def-action-test removing-directory
   (init-repository "dir/file")
   (btr-run '("--rm" "dir/file"))
   (btr-run '("--rm" "dir"))
   (!equal (with-standard-output-to-string (btr-run '("--ls")))
-	  (lines " Name "
-		 "")))
+	  (lines "")))
 
-;;removing non-empty group error
+(def-action-test removing-non-empty-directory
+  (init-repository "dir/file")
+  (!condition (btr-run '("--rm" "dir"))
+	      directory-is-not-empty-error
+	      (directory-is-not-empty-error-path (path-from-string "dir/") :test !path=)
+	      (directory-is-not-empty-error-repository-path (path-from-string "") :test !path=)))
 
-;;removing group with files
-;;removing group with subgroups
-
-;;remoning root error
-
-
-
-
-    
-
-    
-    
-    
+(def-action-test removing-directory-recursive
+  (init-repository "dir/file" "dir/subdir/file")
+  (btr-run '("--rm" "-r" "dir"))
+  (!equal (with-standard-output-to-string (btr-run '("--ls")))
+	  (lines "")))

@@ -219,3 +219,26 @@
 	 (define-class-attributes ,name ,@(mapcar #'make-attribute-definition slots))
 	 (setf (gethash ',name *attributes*) (nconc (gethash ',name *attributes*) 
 						    (gethash ',base-class *attributes*)))))))
+
+(defgeneric method-name (name))
+
+(defgeneric class-argument-position (name))
+(defmethod class-argument-position (name) 0)
+
+(defmacro define-repository-method (name outer-name (&rest args))
+  `(progn (defgeneric ,name (,@args))
+	  (defmethod ,name (,@args)
+	    nil)
+	  (defmethod method-name ((name (eql ,outer-name)))
+	    ',name)))
+
+(define-repository-method initialize-repository :create (repository args))
+
+(defmacro define-repository-function (class name (&rest args) &body body)
+  (flet ((method-args (name args)
+	   (let ((class-arg (class-argument-position name))
+		 (args (copy-list args)))
+	     (setf (nth class-arg args) `(,(nth class-arg args) ,class))
+	     args)))
+    `(defmethod ,(method-name name) ,(method-args name args)
+       ,@body)))
