@@ -12,10 +12,17 @@
 
 (defparameter *btr-actions* ())
 
-(define-condition no-action-specified-error (error) ())
+(define-condition no-action-specified-error (btr-error) ())
 
-(define-condition too-much-actions-specified-error (error) 
+(define-error-string (err no-action-specified-error)
+  (format nil "Error - no action specified.~%"))
+
+(define-condition too-much-actions-specified-error (btr-error) 
   ((actions :initarg :actions :reader too-much-actions-specified-error-actions)))
+
+(define-error-string (err too-much-actions-specified-error)
+  (let ((names (too-much-actions-specified-error-actions err)))
+    (format nil "Error - specified more than one action:~{ ~a,~} ~a.~%" (butlast names) (first (last names)))))
 
 (defun btr-run (arguments)
   (let* ((args (parse-arguments arguments *btr-arguments*))
@@ -55,16 +62,22 @@
 ;; Create action
 ;;
 
-(define-condition repository-does-not-exist-error (error)
+(define-condition repository-does-not-exist-error (btr-error)
   ((path :initarg :path :reader repository-does-not-exist-error-path)))
+
+(define-error-string (err repository-does-not-exist-error)
+  (format nil "Path ~a isn't in repository.~%" (path-to-string (repository-does-not-exist-error-path err))))
 
 (defun check-repository-exists (path)
   (unless (repository-path path)
     (error 'repository-does-not-exist-error :path path))
   t)
 
-(define-condition repository-already-exists-error (error)
+(define-condition repository-already-exists-error (btr-error)
   ((path :initarg :path :reader repository-already-exists-error-path)))
+
+(define-error-string (err repository-already-exists-error)
+  (format nil "Path ~a already in repository.~%" (path-to-string (repository-already-exists-error-path err))))
 
 (defun check-repository-does-not-exist (path)
   (when (repository-path path)
@@ -96,9 +109,13 @@
 		  unit)
 		(find-group (rest (path-path path)) repository))))
 
-(define-condition path-is-not-in-repository-error (error)
+(define-condition path-is-not-in-repository-error (btr-error)
   ((path :initarg :path :reader path-is-not-in-repository-error-path)
    (repository-path :initarg :repository-path :reader path-is-not-in-repository-error-repository-path)))
+
+(define-error-string (err path-is-not-in-repository-error)
+  (format nil "Entity ~a isn't in repository ~a.~%" (path-to-string (path-is-not-in-repository-error-path err))
+	  (path-to-string (path-is-not-in-repository-error-repository-path err))))
 
 (define-repository-action "add" (path args)
   "Adds file to repository"
@@ -213,9 +230,13 @@
 ;; Rm action
 ;;
 
-(define-condition file-is-not-in-repository-error (error)
+(define-condition file-is-not-in-repository-error (btr-error)
   ((path :initarg :path :reader file-is-not-in-repository-error-path)
    (repository-path :initarg :repository-path :reader file-is-not-in-repository-error-repository-path)))
+
+(define-error-string (err file-is-not-in-repository-error)
+  (format nil "File ~a isn't in repository ~a.~%" (path-to-string (file-is-not-in-repository-error-path err))
+	  (path-to-string (file-is-not-in-repository-error-repository-path err))))
 
 (defun find-existing-group (path repository)
   (if (null path)
@@ -225,9 +246,14 @@
 	    (find-existing-group (rest path) group)
 	    nil))))
 
-(define-condition directory-is-not-empty-error (error)
+(define-condition directory-is-not-empty-error (btr-error)
   ((path :initarg :path :reader directory-is-not-empty-error-path)
    (repository-path :initarg :repository-path :reader directory-is-not-empty-error-repository-path)))
+
+(define-error-string (err directory-is-not-empty-error)
+  (format nil "Directory ~a in repository ~a is not empty.~%" 
+	  (path-to-string (directory-is-not-empty-error-path err))
+	  (path-to-string (directory-is-not-empty-error-repository-path err))))
 
 (defun find-entity (path repository)
   (if (parent-path path)
@@ -306,8 +332,11 @@
 
 (defparameter *run-actions* ())
 
-(define-condition no-run-function-error (error)
+(define-condition no-run-function-error (btr-error)
   ((action :initarg :action :reader no-run-function-error-action)))
+
+(define-error-string (err no-run-function-error)
+  (format nil "No run function was specified for ~a.~%" (no-run-function-error-action err)))
 
 (defun run-test (action entities args)
   (let* ((name (argument-name action))

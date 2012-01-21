@@ -10,5 +10,6 @@
 	       (:file "repository-test")
 	       (:file "filesystem-test")
 	       (:file "actions-test")
-	       (:file "extensions-test"))
+	       (:file "extensions-test")
+	       (:file "errors-test"))
   :depends-on (#:burning-btr #:burning-testing))

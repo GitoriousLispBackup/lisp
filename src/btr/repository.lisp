@@ -1,6 +1,13 @@
 (in-package #:burning-btr)
 
-(defconstant *repository-api-version* "0.1")
+(defparameter *repository-api-version* "0.1")
+
+(define-condition btr-error (error) ())
+(defgeneric btr-error-string (err))
+
+(defmacro define-error-string ((variable class) &body body)
+  `(defmethod btr-error-string ((,variable ,class))
+     ,@body))
 
 ;;
 ;; Entity
@@ -16,8 +23,11 @@
 (defclass entities-group ()
   ((entities :initarg :entities :accessor entities)))
 
-(define-condition entity-with-same-name-already-exists (error)
+(define-condition entity-with-same-name-already-exists (btr-error)
   ((name :initarg :name :reader entity-with-same-name-already-exists-name)))
+
+(define-error-string (err entity-with-same-name-already-exists)
+  (format nil "File ~a already in repository.~%" (entity-with-same-name-already-exists-name err)))
 
 (defun add-entity (entity list)
   (when (find (entity-name entity) (entities list) :test #'equal :key #'entity-name)
@@ -140,9 +150,14 @@
 ;; Reading
 ;;
 
-(define-condition wrong-xml-node-name (error)
+(define-condition wrong-xml-node-name (btr-error)
   ((expected :initarg :expected :reader wrong-xml-node-name-expected)
    (got :initarg :got :reader wrong-xml-node-name-got)))
+
+(define-error-string (err wrong-xml-node-name)
+  (format nil "Wrong XML node name - ~a, expected ~a.~%" 
+	  (wrong-xml-node-name-got err)
+	  (wrong-xml-node-name-expected err)))
 
 (defun check-node-name (name node)
   (unless (equal (xml-node-name node) name)
