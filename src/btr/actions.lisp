@@ -30,9 +30,9 @@
 		 :actions (mapcar #'first (remove-if-not #'action-set-p *btr-actions*))))
 	(funcall (rest (find-if #'action-set-p *btr-actions*)) path args)))))
 
-(defmacro define-repository-action (name (&rest lambda-list) &body action)
+(defmacro define-repository-action (name (&rest lambda-list) description &body action)
   (let ((arg-sym (gensym)))
-    `(let ((,arg-sym (make-argument :action ,name)))
+    `(let ((,arg-sym (make-argument :action ,name :description ,description)))
        (progn (add-argument ,arg-sym *btr-arguments*)
 	      (push (cons ,name
 			  #'(lambda (,@lambda-list) ,@action))
@@ -41,14 +41,15 @@
 (defun repository-action (name)
   (argument name *btr-arguments*))
 
+(defmacro define-argument (action spec)
+  (let ((spec (remove-key-argument :group spec))
+	(group (key-argument-value :group spec)))
+    `(update-argument #A,spec ,action ,@(if group `(,group) nil))))
+
 (defmacro define-action-arguments (name &body argument-specs)
   (let ((action-sym (gensym)))
-    (flet ((add-argument-code (spec)
-	     (let ((spec (remove-key-argument :group spec))
-		   (group (key-argument-value :group spec)))
-	       `(update-argument #A,spec ,action-sym ,@(if group `(,group) nil)))))
-      `(let ((,action-sym (repository-action ,name)))
-	 ,@(mapcar #'add-argument-code argument-specs)))))
+    `(let ((,action-sym (repository-action ,name)))
+       ,@(mapcar (lambda (spec) `(define-argument ,action-sym ,spec)) argument-specs))))
 
 ;;
 ;; Create action
@@ -71,6 +72,7 @@
   t)
 
 (define-repository-action "create" (path args)
+  "Creates new repository"
   (check-repository-does-not-exist path)
   (let ((repository (make-repository)))
     (initialize-repository repository args)
@@ -99,6 +101,7 @@
    (repository-path :initarg :repository-path :reader path-is-not-in-repository-error-repository-path)))
 
 (define-repository-action "add" (path args)
+  "Adds file to repository"
   (check-repository-exists path)
   (let ((repository (open-repository (repository-path path)))
 	(args (argument-value "add" args)))
@@ -161,6 +164,7 @@
 		  unit-attributes))))))
 
 (define-repository-action "ls" (path args)
+  "Lists directory of repository"
   (check-repository-exists path)
   (let ((repository (open-repository (repository-path path)))
 	(args (argument-value "ls" args))
@@ -251,6 +255,7 @@
     path))
 
 (define-repository-action "rm" (path args)
+    "Removes file from repository"
   (check-repository-exists path)
   (let ((repository (open-repository (repository-path path)))
 	(files (argument-value "files" (argument-value "rm" args)))
@@ -280,9 +285,10 @@
     (mapc #'mapc-entity entities)))
 
 (define-repository-action "update" (path args)
+  "Updates repository entities"
   (check-repository-exists path)
   (let ((repository (open-repository (repository-path path)))
-	(paths (argument-value "path" args))
+	(paths (argument-value "path" (argument-value "update" args)))
 	(repository-path (repository-path path)))
     (unless paths
       (setf paths (list repository-path)))
@@ -293,3 +299,103 @@
 					       :type '(list existing-path) 
 					       :description "path to update"
 					       :optional))
+
+;;
+;; Run
+;;
+
+(defparameter *run-actions* ())
+
+(define-condition no-run-function-error (error)
+  ((action :initarg :action :reader no-run-function-error-action)))
+
+(defun run-test (action entities args)
+  (let* ((name (argument-name action))
+	 (context (make-instance (gethash name *run-classes*)))
+	 (args (argument-value name args))
+	 (filter (let ((filter-function (filter-function action)))
+		   #'(lambda (unit)
+		       (funcall filter-function unit args)))))
+    (flet ((test-function (run-function)
+	     #'(lambda (unit)
+		 (if (funcall filter unit)
+		     (funcall run-function unit context)))))
+      (let ((setup (gethash name *run-setup-functions*)))
+	(when setup (funcall setup context args)))
+      (let ((run-function (gethash name *run-functions*)))
+	(unless run-function (error 'no-run-function-error :action name))
+	(apply #'mapc-units (test-function run-function) entities))
+      (let ((tear-down (gethash name *run-teardown-functions*)))
+	(when tear-down (funcall tear-down context args))))))
+
+(define-repository-action "run" (path args)
+    "Runs test on repository"
+  (check-repository-exists path)
+  (let ((repository (open-repository (repository-path path)))
+	(args (argument-value "run" args))
+	(repository-path (repository-path path)))
+    (let ((paths (argument-value "path" args)))
+      (unless paths (setf paths (list repository-path)))
+      (let ((run-actions (remove-if-not #'(lambda (action) (argument-set-p (argument-name action) args))
+					*run-actions*)))
+	(unless run-actions (error 'no-action-specified-error))
+	(when (> (length run-actions) 1) (error 'too-much-actions-specified-error 
+						:actions (mapcar #'argument-name run-actions)))
+	(let ((action (first run-actions)))
+	  (run-test action 
+		    (mapcar #'(lambda (path) (find-entity path repository)) paths)
+		    args))))))
+
+(define-action-arguments "run"
+  (:positional "path" 
+	       :type '(list existing-path)
+	       :description "Repository entities to run on"
+	       :optional))
+
+(defmacro define-run-action (name-and-class description &body specs)
+  (let ((name (if (atom name-and-class) name-and-class (first name-and-class)))
+	(class (if (atom name-and-class) 'runner (second name-and-class))))
+    (let ((action-sym (gensym)))
+      `(let ((,action-sym (repository-action "run")))
+	 (setf (gethash ,name *run-classes*) ',class)
+	 (define-argument ,action-sym (:action ,name :description ,description))
+	 (let ((,action-sym (argument ,name ,action-sym)))
+	   (setf *run-actions* (remove ,name *run-actions* :test #'equal :key #'argument-name))
+	   (push ,action-sym *run-actions*)
+	   ,@(mapcar #'(lambda (spec) `(define-argument ,action-sym ,spec)) specs))))))
+
+(defun filter-function (action)
+  (let ((value (gethash (argument-name action) *run-filter-functions*)))
+    (if value value
+	(constantly t))))
+
+(defmacro define-run-variables (&body names)
+  `(progn 
+     ,@(mapcar #'(lambda (name)
+		   `(defvar ,name (make-hash-table :test #'equal)))
+	       names)))
+
+(define-run-variables *run-classes*
+		      *run-functions*
+		      *run-filter-functions*
+		      *run-setup-functions*
+		      *run-teardown-functions*)
+
+(defmacro define-run-function (action-name type (&rest args) &body body)
+  (flet ((run-function (type)
+	   (ecase type
+	     (:run '*run-functions*)
+	     (:filter '*run-filter-functions*)
+	     (:setup '*run-setup-functions*)
+	     (:teardown '*run-teardown-functions*))))
+    `(setf (gethash ,action-name ,(run-function type)) 
+	   (lambda (,@args) ,@body))))
+
+(defclass runner () ())
+
+(defmacro define-run-class (name &body slots)
+  `(defclass ,name (runner)
+     (,@slots)))
+
+
+

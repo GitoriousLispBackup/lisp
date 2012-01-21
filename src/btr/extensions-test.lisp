@@ -113,3 +113,81 @@
 	  (lines " Path  version  owner  "
 		 ""
 		 " file  6        itself ")))
+
+(define-run-action "myRun"
+    "Runs my repository")
+
+(define-run-function "myRun" :run (unit context)
+  (format t "Unit ~a was run.~%" (entity-name unit)))
+
+(def-extension-test simple-run
+  (init-repository "file")
+  (!equal (with-standard-output-to-string (btr-run '("--run" "--myRun")))
+	  (lines "Unit file was run.")))
+
+(define-run-function "myRun" :filter (unit args)
+  (if (find #\. (entity-name unit)) nil t))
+
+(def-extension-test run-with-filtering
+  (init-repository "file" "a.file")
+  (!equal (with-standard-output-to-string (btr-run '("--run" "--myRun")))
+	  (lines "Unit file was run.")))
+
+(define-run-class mega-runner
+  (units :initform () :accessor mr-units))
+
+(define-run-action ("other run" mega-runner) 
+    "The best repository runner"
+  (:key "skip" :type 'string :description "units to skip"))
+
+(define-run-function "other run" :setup (context args)
+  (setf (mr-units context) '("start"))
+  (format t "Set up~%"))
+
+(define-run-function "other run" :tearDown (context args)
+  (format t "Tear down context ~{~a ~}~%" (mr-units context)))
+
+(define-run-function "other run" :run (unit context)
+  (push (entity-name unit) (mr-units context)))
+
+(define-run-function "other run" :filter (unit args)
+  (if (argument-set-p "skip" args)
+      (not (string= (entity-name unit) (argument-value "skip" args)))
+      t))
+
+(def-extension-test setup-and-teardown
+  (init-repository)
+  (!equal (with-standard-output-to-string (btr-run '("--run" "--other run")))
+	  (lines "Set up"
+		 "Tear down context start ")))
+
+(def-extension-test complex-run-test
+  (init-repository "file1"
+		   "file2"
+		   "dir/file3"
+		   "file4")
+  (!equal (with-standard-output-to-string (btr-run '("--run" "--other run" "--skip" "file2")))
+	  (lines "Set up"
+		 "Tear down context file4 file3 file1 start ")))
+
+(def-extension-test run-without-action-error
+  (init-repository)
+  (!condition (btr-run '("--run"))
+	      no-action-specified-error))
+
+(def-extension-test run-with-several-actions-error
+  (init-repository)
+  (!condition (btr-run '("--run" "--myRun" "--other run"))
+	      too-much-actions-specified-error
+	      (too-much-actions-specified-error-actions '("other run" "myRun"))))
+
+(define-run-action "wrong run" 
+    "Runs repository wrong")
+
+(def-extension-test run-without-run
+  (init-repository "file")
+  (!condition (btr-run '("--run" "--wrong run"))
+	      no-run-function-error
+	      (no-run-function-error-action "wrong run")))
+
+

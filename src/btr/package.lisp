@@ -44,6 +44,10 @@
 
 	   #:define-repository-function
 
+	   #:define-run-action
+	   #:define-run-function
+	   #:define-run-class
+
 	   #:repository-path
 	   #:write-repository
 
@@ -53,6 +57,9 @@
 
 	   #:too-much-actions-specified-error
 	   #:too-much-actions-specified-error-actions
+
+	   #:no-run-function-error
+	   #:no-run-function-error-action
 
 	   #:repository-already-exists-error
 	   #:repository-already-exists-error-path
