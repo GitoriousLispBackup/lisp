@@ -7,8 +7,8 @@
   (name :xml-name "a_name" :initform 1 :accessor mr-name))
 
 (define-btr-class my-unit unit
-  (version :initform 0 :reader mu-version)
-  (owner :initform "unknown" :reader mu-owner))
+  (version :initform 0 :accessor mu-version)
+  (owner :initform "unknown" :accessor mu-owner))
 
 (defmacro def-extension-test (name &body body)
   `(deftest extension-test ,name ()
@@ -85,3 +85,31 @@
   (btr-run '("--create"))
   (!equal (read-file (path-from-string ".btr/repository.conf"))
 	  (lines "<repository version=\"0.1\" a_name=\"created repository\" status=\"unspecified\"/>")))
+
+(define-repository-function my-unit :add (unit)
+  (setf (mu-version unit) (length-of-file (path-from-string (first (unit-files unit)))))
+  (setf (mu-owner unit) "itself"))
+
+(def-extension-test adding-units
+  (init-repository "file")
+  (!equal (with-standard-output-to-string (btr-run '("--ls")))
+	  (lines " Path  version  owner  "
+		 ""
+		 " file  0        itself ")))
+
+(define-repository-function my-unit :remove (unit)
+  (remove-file (path-from-string (first (unit-files unit)))))
+
+(def-extension-test removing-extended-units
+  (init-repository "file")
+  (btr-run '("--rm" "file"))
+  (!null (path-exists-p (path-from-string "file"))))
+
+(def-extension-test updating-attributes
+  (init-repository "file")
+  (write-file (path-from-string "file") "a file")
+  (btr-run '("--update"))
+  (!equal (with-standard-output-to-string (btr-run '("--ls")))
+	  (lines " Path  version  owner  "
+		 ""
+		 " file  6        itself ")))

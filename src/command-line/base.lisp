@@ -74,8 +74,10 @@
   (do-check-arguments-list (arguments-list-arguments list :include-positionals nil)))
 
 (defun do-add-argument (arg list &optional (group-name "ARGS"))
-  (unless (typep arg 'group)
-    (do-check-arguments-list (cons arg (arguments-list-arguments list :include-positionals nil))))
+  (do-check-arguments-list (append (if (group-p arg) 
+				       (arguments-list-arguments arg :include-positionals nil)
+				       (list arg))
+				   (arguments-list-arguments list :include-positionals nil)))
   (if (group-p arg)
       (setf (%arguments-list-arguments list)
 	    (nconc (%arguments-list-arguments list) (list arg)))
@@ -88,6 +90,26 @@
 
 (defmacro add-argument (arg list &key (group nil))
   `(do-add-argument ,arg ,list ,@(if group (list group) ())))
+
+(defun update-argument (arg list &optional (group-name "ARGS"))
+  (if (group-p arg)
+      (let ((position (position (arguments-list-name arg) (%arguments-list-arguments list) 
+				:test #'equal 
+				:key #'arguments-list-name)))
+	(if position 
+	    (setf (nth position (%arguments-list-arguments list)) arg)
+	    (add-argument arg list :group group-name)))
+      (let* ((group (find group-name (groups list) :test #'equal :key #'arguments-list-name))
+	     (position (position (argument-name arg) (%arguments-list-arguments group) 
+				 :test #'equal 
+				 :key #'argument-name)))
+	(if (and group position)
+	    (progn
+	      (setf (nth position (%arguments-list-arguments  group)) arg)
+	      (setf (slot-value arg 'group) group)
+	      (when (typep arg 'action)
+		(setf (slot-value arg 'parent) list)))
+	    (add-argument arg list :group group-name)))))
 
 (defmacro argument-from-spec (spec)
   (parse-argument-spec (first spec) (rest spec)))

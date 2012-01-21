@@ -8,6 +8,7 @@
 	   #:make-arguments-spec
 	   #:add-argument
 	   #:add-arguments
+	   #:update-argument
 	   #:argument
 	   #:have-argument-p
 	   #:help-message

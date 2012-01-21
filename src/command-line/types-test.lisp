@@ -2,15 +2,6 @@
 
 (defcase types-test)
 
-(defmacro !parse ((&rest args) spec &body values)
-  (let ((args-sym (gensym)))
-    (flet ((value-check (value)
-	     (destructuring-bind (test name value) value
-	       `(,test (argument-value ,name ,args-sym) ,value))))
-      `(let ((,args-sym (parse-arguments ',args ,spec)))
-	 (declare (ignorable ,args-sym))
-	 ,@(mapcar #'value-check values)))))
-
 (deftest types-test integer-type-test ()
   (let ((spec (make-arguments-spec "" (:key "key" :type 'integer))))
     (!parse ("--key" "12345") spec (!= "key" 12345))

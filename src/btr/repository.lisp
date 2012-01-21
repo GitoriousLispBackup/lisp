@@ -232,7 +232,10 @@
 	  (defmethod method-name ((name (eql ,outer-name)))
 	    ',name)))
 
-(define-repository-method initialize-repository :create (repository args))
+(eval-when (:complive-toplevel :load-toplevel :execute)
+  (define-repository-method initialize-repository :create (repository args))
+  (define-repository-method initialize-unit :add (unit))
+  (define-repository-method release-unit :remove (unit)))
 
 (defmacro define-repository-function (class name (&rest args) &body body)
   (flet ((method-args (name args)

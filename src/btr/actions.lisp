@@ -46,7 +46,7 @@
     (flet ((add-argument-code (spec)
 	     (let ((spec (remove-key-argument :group spec))
 		   (group (key-argument-value :group spec)))
-	       `(add-argument #A,spec ,action-sym ,@(if group `(,group) nil)))))
+	       `(update-argument #A,spec ,action-sym ,@(if group `(,group) nil)))))
       `(let ((,action-sym (repository-action ,name)))
 	 ,@(mapcar #'add-argument-code argument-specs)))))
 
@@ -89,7 +89,9 @@
 
 (defun add-unit (path repository)
   (let ((name (path-to-string (copy-path path :new-path '(:relative)))))
-    (add-entity (make-unit name :files (list (path-to-string path)))
+    (add-entity (let ((unit (make-unit name :files (list (path-to-string path)))))
+		  (initialize-unit unit)
+		  unit)
 		(find-group (rest (path-path path)) repository))))
 
 (define-condition path-is-not-in-repository-error (error)
@@ -223,19 +225,30 @@
   ((path :initarg :path :reader directory-is-not-empty-error-path)
    (repository-path :initarg :repository-path :reader directory-is-not-empty-error-repository-path)))
 
+(defun find-entity (path repository)
+  (if (parent-path path)
+      (let ((path (path-as-file path)))
+	(let ((group (find-existing-group (rest (path-path path)) repository))
+	      (name (path-to-string (copy-path path :new-path '(:relative)))))
+	  (unless (and group (find name (entities group) :test #'equal :key #'entity-name))
+	    (error 'file-is-not-in-repository-error :path path :repository-path (repository-path path)))
+	  (values (find name (entities group) :test #'equal :key #'entity-name) group)))
+      repository))
+
 (defun remove-unit (path repository &optional recursive)
-  (let ((path (path-as-file path)))
-    (let ((group (find-existing-group (rest (path-path path)) repository))
-	  (name (path-to-string (copy-path path :new-path '(:relative)))))
-      (unless (and group (find name (entities group) :test #'equal :key #'entity-name))
-	(error 'file-is-not-in-repository-error :path path :repository-path (repository-path path)))
-      (let* ((entity-name (path-to-string (copy-path path :new-path '(:relative))))
-	     (entity (find entity-name (entities group) :test #'equal :key #'entity-name)))
-	(when (and (typep entity 'group) (entities entity) (not recursive))
-	  (error 'directory-is-not-empty-error
-		 :path (path-as-directory path)
-		 :repository-path (repository-path path)))
-	(remove-entity entity-name group)))))
+  (multiple-value-bind (entity group) (find-entity path repository)
+    (when (and (typep entity 'group) (entities entity) (not recursive))
+      (error 'directory-is-not-empty-error
+	     :path (path-as-directory path)
+	     :repository-path (repository-path path)))
+    (release-unit entity)
+    (remove-entity (entity-name entity) group)))
+
+(defun to-relative-path (path repository-path)
+  (let ((path (path- (as-absolute-path path) (as-absolute-path repository-path))))
+    (unless path
+      (error 'path-is-not-in-repository-error :repository-path repository-path :path path))
+    path))
 
 (define-repository-action "rm" (path args)
   (check-repository-exists path)
@@ -243,13 +256,8 @@
 	(files (argument-value "files" (argument-value "rm" args)))
 	(args (argument-value "rm" args))
 	(repository-path (repository-path path)))
-    (flet ((to-relative-path (path)
-	     (let ((path (path- (as-absolute-path path) (as-absolute-path repository-path))))
-	       (unless path
-		 (error 'path-is-not-in-repository-error :repository-path repository-path :path path))
-	       path)))
-      (mapc #'(lambda (path) (remove-unit path repository (argument-set-p "recursive" args)))
-	    (mapcar #'to-relative-path files)))
+    (mapc #'(lambda (path) (remove-unit path repository (argument-set-p "recursive" args)))
+	  (mapcar #'(lambda (path) (to-relative-path path repository-path)) files))
     (write-repository repository repository-path)))
 
 (define-action-arguments "rm"
@@ -260,5 +268,28 @@
 	 :short-name #\r
 	 :description "recursive remove entity and it's subentites"))
 
-	       
-  
+;;
+;; Update
+;;
+
+(defun mapc-units (fun &rest entities)
+  (labels ((mapc-entity (entity)
+	     (cond
+	       ((typep entity 'unit) (funcall fun entity))
+	       (t (mapc #'mapc-entity (entities entity))))))
+    (mapc #'mapc-entity entities)))
+
+(define-repository-action "update" (path args)
+  (check-repository-exists path)
+  (let ((repository (open-repository (repository-path path)))
+	(paths (argument-value "path" args))
+	(repository-path (repository-path path)))
+    (unless paths
+      (setf paths (list repository-path)))
+    (apply #'mapc-units #'initialize-unit (mapcar #'(lambda (path) (find-entity path repository)) paths))
+    (write-repository repository repository-path)))
+
+(define-action-arguments "update" (:positional "path" 
+					       :type '(list existing-path) 
+					       :description "path to update"
+					       :optional))

@@ -2,6 +2,15 @@
 
 (defcase base-test)
 
+(defmacro !parse ((&rest args) spec &body values)
+  (let ((args-sym (gensym)))
+    (flet ((value-check (value)
+	     (destructuring-bind (test name value) value
+	       `(,test (argument-value ,name ,args-sym) ,value))))
+      `(let ((,args-sym (parse-arguments ',args ,spec)))
+	 (declare (ignorable ,args-sym))
+	 ,@(mapcar #'value-check values)))))
+
 ;;
 ;; Flags test
 ;; 
@@ -406,6 +415,23 @@
     (add-argument #A(:positional "bla" :type 'string) spec)
     (let ((args (parse-arguments '("blabla") spec)))
       (!equal (argument-value "bla" args) "blabla"))))
+
+(deftest base-test adding-argument-twice ()
+  (let ((spec (make-arguments-spec "" (:flag "flag"))))
+    (!condition (add-argument #A(:group "group" :arguments ((:flag "flag"))) spec)
+		argument-already-exists-error)))
+
+(deftest base-test updating-argument ()
+  (let ((spec (make-arguments-spec "" (:flag "flag"))))
+    (update-argument #A(:key "flag" :type 'integer) spec)
+    (!parse ("--flag" "123") spec
+      (!= "flag" 123))))
+
+(deftest base-test updating-positional ()
+  (let ((spec (make-arguments-spec "" (:positional "p" :type 'integer))))
+    (update-argument #A(:positional "p" :type 'string) spec)
+    (!parse ("bla") spec
+      (!equal "p" "bla"))))
 
 (deftest base-test defining-positional ()
   (let ((spec (make-arguments-spec "" (:positional "key" :type 'integer))))
