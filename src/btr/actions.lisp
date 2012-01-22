@@ -332,6 +332,18 @@
 
 (defparameter *run-actions* ())
 
+(defmacro define-run-variables (&body names)
+  `(progn 
+     ,@(mapcar #'(lambda (name)
+		   `(defvar ,name (make-hash-table :test #'equal)))
+	       names)))
+
+(define-run-variables *run-classes*
+		      *run-functions*
+		      *run-filter-functions*
+		      *run-setup-functions*
+		      *run-teardown-functions*)
+
 (define-condition no-run-function-error (btr-error)
   ((action :initarg :action :reader no-run-function-error-action)))
 
@@ -398,17 +410,7 @@
     (if value value
 	(constantly t))))
 
-(defmacro define-run-variables (&body names)
-  `(progn 
-     ,@(mapcar #'(lambda (name)
-		   `(defvar ,name (make-hash-table :test #'equal)))
-	       names)))
 
-(define-run-variables *run-classes*
-		      *run-functions*
-		      *run-filter-functions*
-		      *run-setup-functions*
-		      *run-teardown-functions*)
 
 (defmacro define-run-function (action-name type (&rest args) &body body)
   (flet ((run-function (type)

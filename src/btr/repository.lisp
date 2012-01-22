@@ -247,7 +247,7 @@
 	  (defmethod method-name ((name (eql ,outer-name)))
 	    ',name)))
 
-(eval-when (:complive-toplevel :load-toplevel :execute)
+(eval-when (:compile-toplevel :load-toplevel :execute)
   (define-repository-method initialize-repository :create (repository args))
   (define-repository-method initialize-unit :add (unit))
   (define-repository-method release-unit :remove (unit)))

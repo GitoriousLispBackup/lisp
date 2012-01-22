@@ -88,15 +88,18 @@
 
 (defun from-pathname (pathname)
   (flet ((do-make-directory-path (pathname)
-	   (make-directory-path :host (pathname-host pathname)
-				:device (pathname-device pathname)
-				:path (pathname-directory pathname))))
-  (if (%directory-p pathname)
-      (do-make-directory-path pathname)
-      (make-file-path :name (pathname-name pathname)
-		      :type (pathname-type pathname)
-		      :version (pathname-version pathname)
-		      :directory (do-make-directory-path pathname)))))
+	   (let ((path (make-directory-path :host (pathname-host pathname)
+					    :device (pathname-device pathname)
+					    :path (pathname-directory pathname))))
+	     (unless (directory-path path)
+	       (setf (directory-path path) '(:relative)))
+	     path)))
+    (if (%directory-p pathname)
+	(do-make-directory-path pathname)
+	(make-file-path :name (pathname-name pathname)
+			:type (pathname-type pathname)
+			:version (pathname-version pathname)
+			:directory (do-make-directory-path pathname)))))
 
 ;;
 ;; Implementation for fs-interface for common lisp pathnames.
